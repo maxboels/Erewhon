@@ -54,12 +54,79 @@ git checkout main
 
 This will only download and track files in the `src/robots/rover` folder, saving significant disk space.
 
+## Updating Git Remote on Raspberry Pi (One-Time Setup)
+
+If you already have the old `quantum-tracer-il` repository on the Raspberry Pi, here's how to update it to point to the new Erewhon repository:
+
+### Step 1: SSH into Raspberry Pi
+```bash
+ssh pi@<raspberry-pi-ip>
+```
+
+### Step 2: Navigate to the Repository
+```bash
+cd /path/to/quantum-tracer-il  # or wherever your repo is
+```
+
+### Step 3: Check Current Remote
+```bash
+git remote -v
+# Should show: origin  https://github.com/maxboels/quantum-tracer-il.git
+```
+
+### Step 4: Update Remote URL
+```bash
+# Update the remote to point to Erewhon
+git remote set-url origin https://github.com/maxboels/Erewhon.git
+
+# Verify the change
+git remote -v
+# Should now show: origin  https://github.com/maxboels/Erewhon.git
+```
+
+### Step 5: Fetch and Switch to Main Branch
+```bash
+# Fetch the new repository structure
+git fetch origin
+
+# Switch to the main branch of Erewhon
+git checkout main
+
+# If you get an error, force the switch:
+git checkout -B main origin/main
+```
+
+### Step 6: Set Up Sparse Checkout (Optional but Recommended)
+Since the Raspberry Pi only needs the rover folder, configure sparse checkout:
+
+```bash
+# Enable sparse checkout
+git config core.sparseCheckout true
+
+# Specify only the rover folder
+echo "src/robots/rover/" > .git/info/sparse-checkout
+
+# Update the working directory
+git checkout main
+```
+
+### Step 7: Verify Setup
+```bash
+# Check that only rover files are present
+ls -la
+# You should see only src/robots/rover/ and the root files
+
+# Check git status
+git status
+# Should show "On branch main" with a clean working tree
+```
+
 ## Daily Workflow on Raspberry Pi
 
 Once set up, you can work normally:
 
 ```bash
-# Pull latest changes (only rover folder)
+# Pull latest changes (only rover folder if sparse checkout is enabled)
 git pull
 
 # Make your changes to files in src/robots/rover/
@@ -72,6 +139,29 @@ git commit -m "Your commit message"
 
 # Push changes
 git push
+```
+
+### Troubleshooting
+
+**If git pull shows conflicts or unwanted files:**
+```bash
+# Reset to the remote state
+git fetch origin
+git reset --hard origin/main
+```
+
+**If you need to check what's being tracked:**
+```bash
+# See sparse checkout configuration
+cat .git/info/sparse-checkout
+
+# List all tracked files
+git ls-files
+```
+
+**If you want to disable sparse checkout and see all files:**
+```bash
+git sparse-checkout disable
 ```
 
 ## Viewing What's Included in Sparse Checkout
