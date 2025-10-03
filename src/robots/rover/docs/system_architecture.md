@@ -52,13 +52,6 @@ RC Transmitter → ESC/Receiver → Arduino UNO R3 → USB Serial → Raspberry 
 - `arduino_range_tester.py` - PWM range calibration
 - `interactive_calibration.py` - Interactive calibration tool
 
-## Deprecated Components
-
-**⚠️ No longer used:**
-- Direct GPIO PWM reading (`data_logger.py`, `control_*.py`)
-- pigpio daemon requirement
-- Logic level converters for PWM signals
-- Raspberry Pi GPIO pins 18 & 23 for PWM input
 
 ## Data Format
 
