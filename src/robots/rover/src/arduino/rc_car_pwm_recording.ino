@@ -2,9 +2,19 @@
 // Reads two PWM channels (steering + throttle) and sends formatted data via Serial
 // Optimized for real-time data collection with timestamp synchronization
 
+// -------------------- Physical Wiring --------------------
+// RC Receiver → Arduino UNO R3:
+//   Brown wire  → GND (ground)
+//   Purple wire → Pin 2 (Steering PWM signal)
+//   Black wire  → Pin 3 (Throttle PWM signal)
+//
+// Measured PWM Characteristics:
+//   Steering: ~50Hz (21ms period), 1008-1948 us pulses
+//   Throttle: ~900Hz (1ms period), 0-948 us pulses
+
 // -------------------- Configuration --------------------
-const byte THROTTLE_PIN = 2;  // Pin for throttle PWM (900Hz, 0-70% duty)
-const byte STEERING_PIN = 3;  // Pin for steering PWM (50Hz, 5-9.2% duty)
+const byte STEERING_PIN = 2;  // Purple wire from receiver
+const byte THROTTLE_PIN = 3;  // Black wire from receiver
 const unsigned long SAMPLE_RATE_MS = 33; // ~30Hz to match camera (33.33ms)
 
 // -------------------- Global Variables - Throttle --------------------
