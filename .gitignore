@@ -39,3 +39,7 @@ Thumbs.db
 # Project specific
 episodes/
 *.log
+
+# Private documentation with sensitive info
+README_private.md
+*_private.md
