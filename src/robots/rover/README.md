@@ -52,9 +52,9 @@ python3 src/debug/pwm_calibration_validator.py \
 
 ### 3. Collect Training Data
 ```bash
-python3 src/robots/rover/src/record/integrated_data_collector.py \
-  --episode-duration 10 \
-  --output-dir ./episodes \
+python3 src/robots/rover/src/record/episode_recorder.py \
+  --episode-duration 6 \
+  --output-dir ./src/robots/rover/episodes/ \
   --arduino-port /dev/ttyACM0
 ```
 
