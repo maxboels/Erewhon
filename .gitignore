@@ -37,7 +37,7 @@ ENV/
 Thumbs.db
 
 # Project specific
-episodes/
+# episodes/
 *.log
 
 # Private documentation with sensitive info
