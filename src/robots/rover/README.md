@@ -115,6 +115,63 @@ python3 src/record/episode_analyzer.py \
   --plots
 ```
 
+**Create episode animations (video/gif with live control plots):**
+```bash
+# Create MP4 animation for all episodes (default, skips existing)
+python3 src/eval/create_episode_animation.py --data_dir ./episodes --fps 10
+
+# Force recreation even if animations already exist
+python3 src/eval/create_episode_animation.py \
+  --data_dir ./episodes \
+  --force
+
+# Create animation for specific episodes
+python3 src/eval/create_episode_animation.py \
+  --data_dir ./episodes \
+  --episodes episode_20251006_220059 episode_20251006_220145 \
+  --format mp4
+
+# Create GIF animation (smaller file size, good for sharing)
+python3 src/eval/create_episode_animation.py \
+  --data_dir ./episodes \
+  --format gif \
+  --fps 8
+
+# Create combined multi-episode animation (side-by-side comparison)
+python3 src/eval/create_episode_animation.py \
+  --data_dir ./episodes \
+  --combined \
+  --format mp4 \
+  --output_dir ./animations
+
+# Full command with all options
+python3 src/eval/create_episode_animation.py \
+  --data_dir ./episodes \
+  --output_dir ./episode_animations \
+  --fps 10 \
+  --episodes episode_20251006_220059 \
+  --format mp4 \
+  --combined \
+  --force
+```
+
+**Animation features:**
+- 📹 Camera view with synchronized frames
+- 📊 Live steering and throttle plots
+- 📈 Episode statistics and metadata
+- 🎬 MP4 or GIF output formats
+- 🔄 Single or multi-episode comparisons
+- ⚡ Smart caching - skips existing animations (use `--force` to override)
+
+**Interactive frame viewer (browse frames with keyboard):**
+```bash
+python3 src/eval/episode_frame_viewer.py \
+  --episode-dir ./episodes/episode_20251006_220059
+
+# Use arrow keys to navigate frames
+# Press 'q' to quit
+```
+
 ## Project Structure
 
 ```
@@ -124,7 +181,9 @@ src/
 ├── eval/                           # Evaluation & validation tools
 │   ├── validate_episode_data.py    # Check data quality & PWM ranges
 │   ├── clean_episode_data.py       # Remove anomalous samples
-│   └── pwm_statistics.py           # Analyze PWM distributions
+│   ├── pwm_statistics.py           # Analyze PWM distributions
+│   ├── create_episode_animation.py # Create video/gif animations with plots
+│   └── episode_frame_viewer.py     # Interactive frame browser
 ├── record/
 │   ├── episode_recorder.py         # Main data collection script
 │   └── episode_analyzer.py         # Visualize single episode
@@ -147,6 +206,8 @@ src/
 | `clean_episode_data.py` | Removes anomalous data samples (optional) |
 | `pwm_statistics.py` | Analyzes PWM value distributions |
 | `episode_analyzer.py` | Visualizes and analyzes single episodes |
+| `create_episode_animation.py` | Creates animated videos/gifs with control plots |
+| `episode_frame_viewer.py` | Interactive frame-by-frame browser |
 | `system_architecture.md` | Complete system documentation |
 
 ## Data Flow

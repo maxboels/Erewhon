@@ -1,8 +1,52 @@
-# QuantumTracer Imitation Learning
+# ACT Policy for Imitation Learning
 
-> **Autonomous RC Car Navigation using Vision-Based Imitation Learning**
+> **Action Chunking Transformer (ACT) implementation for autonomous RC car navigation**
 
-This project implements autonomous navigation for the QuantumTracer RC car using imitation learning with the ACT (Action Chunking Transformer) policy, built on top of the LeRobot framework.
+This directory contains ACT-specific training, inference, and testing tools built on top of the LeRobot framework.
+
+## 📁 Directory Structure
+
+### Training Files
+- `enhanced_act_trainer.py` - Enhanced ACT trainer with advanced features
+- `hybrid_lerobot_trainer.py` - Hybrid training approach
+- `official_act_trainer.py` - Official ACT implementation trainer
+- `official_lerobot_trainer.py` - Official LeRobot trainer
+- `simple_act_trainer.py` - Simplified ACT trainer for quick experiments
+- `tensorboard_act_trainer.py` - Training with TensorBoard integration
+- `train_local_act.py` - Local training script
+
+### Inference & Testing
+- `inference_act.py` - ACT policy inference
+- `test_inference.py` - Inference testing utilities
+- `test_official_act.py` - Official ACT testing
+- `test_tracer_integration.py` - Integration testing
+
+### Setup & Pipeline
+- `setup_lerobot.py` - LeRobot framework setup
+- `tracer_pipeline.py` - Complete training pipeline
+
+### Configuration
+- `config/` - Training, environment, and policy configurations
+
+### LeRobot Framework
+- `lerobot/` - LeRobot framework (submodule or local copy)
+
+## 🔄 Related Tools (Reorganized)
+
+The following tools have been moved to more appropriate locations:
+
+### Dataset Analysis → `/src/datasets/analysis/`
+- `analyze_dataset.py`
+- `quick_dataset_analysis.py`
+- `simple_analysis.py`
+- `plot_training_signals.py`
+
+### Dataset Loading → `/src/datasets/`
+- `local_dataset_loader.py`
+
+### Episode Visualization → `/src/robots/rover/src/eval/`
+- `create_episode_animation.py` - Create animated videos/GIFs
+- `episode_frame_viewer.py` - Interactive frame browser
 
 ## 🚀 Quick Start - Remote Inference Setup
 
