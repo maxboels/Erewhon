@@ -210,9 +210,10 @@ class CameraCapture:
 class EpisodeRecorder:
     """Coordinates episode recording"""
     
-    def __init__(self, output_dir: str, episode_duration: int = 15):
+    def __init__(self, output_dir: str, episode_duration: int = 15, action_label: str = "hit red balloon"):
         self.output_dir = output_dir
         self.episode_duration = episode_duration
+        self.action_label = action_label
         self.arduino_reader = ArduinoReader()
         self.camera = CameraCapture()
         
@@ -334,6 +335,7 @@ class EpisodeRecorder:
         # Convert to serializable format
         episode_dict = {
             "episode_id": episode_data.episode_id,
+            "action_label": self.action_label,
             "start_time": episode_data.start_time,
             "end_time": episode_data.end_time,
             "duration": episode_data.duration,
@@ -406,6 +408,7 @@ def main():
     parser.add_argument('--output-dir', type=str, default='./episodes', help='Output directory for episodes')
     parser.add_argument('--arduino-port', type=str, default='/dev/ttyACM0', help='Arduino serial port')
     parser.add_argument('--camera-id', type=int, default=0, help='Camera device ID')
+    parser.add_argument('--action-label', type=str, default='hit red balloon', help='Action label for VLA training')
     
     args = parser.parse_args()
     
@@ -415,10 +418,12 @@ def main():
     print(f"Output Directory: {args.output_dir}")
     print(f"Arduino Port: {args.arduino_port}")
     print(f"Camera ID: {args.camera_id}")
+    print(f"Action Label: {args.action_label}")
     
     recorder = EpisodeRecorder(
         output_dir=args.output_dir,
-        episode_duration=args.episode_duration
+        episode_duration=args.episode_duration,
+        action_label=args.action_label
     )
     
     # Update Arduino reader and camera settings if provided
