@@ -131,11 +131,12 @@ class ArduinoReader:
 class CameraCapture:
     """Handles camera frame capture"""
     
-    def __init__(self, camera_id: int = 0, fps: int = 30, resolution: Tuple[int, int] = (640, 480), flip_vertically: bool = True):
+    def __init__(self, camera_id: int = 0, fps: int = 30, resolution: Tuple[int, int] = (640, 480), flip_vertically: bool = False, flip_horizontally: bool = False):
         self.camera_id = camera_id
         self.fps = fps
         self.resolution = resolution
         self.flip_vertically = flip_vertically
+        self.flip_horizontally = flip_horizontally
         self.cap = None
         self.running = False
         self.frame_queue = queue.Queue()
@@ -188,6 +189,10 @@ class CameraCapture:
                     # Apply vertical flip if requested
                     if self.flip_vertically:
                         frame = cv2.flip(frame, 0)  # 0 = flip around x-axis (vertical flip)
+                    
+                    # Apply horizontal flip if requested
+                    if self.flip_horizontally:
+                        frame = cv2.flip(frame, 1)  # 1 = flip around y-axis (horizontal flip)
                     
                     self.frame_counter += 1
                     frame_sample = FrameSample(
@@ -419,7 +424,8 @@ def main():
     # Update Arduino reader and camera settings if provided
     recorder.arduino_reader.port = args.arduino_port
     recorder.camera.camera_id = args.camera_id
-    recorder.camera.flip_vertically = True # Default to True for upside-down mounting
+    recorder.camera.flip_vertically = False # Default to True for upside-down mounting
+    recorder.camera.flip_horizontally = False # Default to True for horizontal flip
     
     try:
         episode_num = 1
