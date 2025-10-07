@@ -39,6 +39,7 @@ Thumbs.db
 # Project specific
 episodes/episode_*/frames/
 src/robots/rover/episodes/episode_*/frames/frame_*.jpg
+episode_animations/
 *.log
 
 # Private documentation with sensitive info

@@ -94,7 +94,47 @@ python3 src/record/episode_recorder.py --resolution 640x480
 python3 src/record/episode_recorder.py --resolution 1280x720
 ```
 
-### 4. Validate & Analyze Episode Data
+### 4. Transfer Episode Data to Your Laptop ⚡ **RECOMMENDED**
+
+**Important**: Episode data (images) should **NOT** be pushed to GitHub. Instead, transfer them directly from the Raspberry Pi to your laptop using one of these methods:
+
+**Option 1: SCP (Simple, one-time copy)**
+```bash
+# From your laptop terminal, copy episodes from Pi to local clone
+scp -C -r mboels@raspberrypi:~/EDTH2025/Erewhon/src/robots/rover/episodes ./src/robots/rover/
+
+# Copy specific episode only
+scp -C -r mboels@raspberrypi:~/EDTH2025/Erewhon/src/robots/rover/episodes/episode_20251007_144013 ./src/robots/rover/episodes/
+```
+
+**Option 2: rsync (Smart, incremental sync - recommended for multiple transfers)**
+```bash
+# From your laptop, sync only new/changed episodes
+rsync -avz --progress mboels@raspberrypi:~/EDTH2025/Erewhon/src/robots/rover/episodes/ ./src/robots/rover/episodes/
+
+# This only copies new files, making subsequent syncs very fast
+```
+
+**Option 3: VS Code Remote (GUI - easiest)**
+- In VS Code's Remote Explorer, navigate to `src/robots/rover/episodes/`
+- Right-click the episode folder → **"Download..."**
+- Choose your local workspace location
+- Transfer happens instantly! ✨
+
+**Why transfer directly instead of using Git?**
+- ⚡ **Instant transfer** - Direct download is much faster than push/pull
+- 🚀 **Faster git operations** - Keep your repository lightweight (code only)
+- 💾 **Better practice** - Git is for code, not training data
+- 🎯 **Selective sync** - Only download episodes you need for training
+- 📦 **No GitHub limits** - Avoid large file warnings and storage issues
+
+**Workflow:**
+1. Record episodes on Raspberry Pi
+2. Transfer data directly to laptop (instant!)
+3. Train ML models locally with the data
+4. Only push/pull code changes via Git
+
+### 5. Validate & Analyze Episode Data
 
 **Validate all episodes:**
 ```bash
@@ -318,6 +358,20 @@ Each recorded episode contains:
 - `control_data.csv` - PWM control samples
 - `frame_data.csv` - Frame metadata
 - `frames/` - Directory with all captured images
+
+## Data Management
+
+**Episode data is excluded from Git:**
+- The `episodes/` and `episode_animations/` folders are in `.gitignore`
+- This keeps the repository lightweight and fast
+- Episode data should be transferred directly (see section 4 above)
+- Only code and documentation are version controlled
+
+**Storage considerations:**
+- Each 6-second episode at 640x360 ≈ 4.3 MB
+- At 640x480 ≈ 13 MB (not recommended)
+- 10 episodes at 640x360 ≈ 43 MB
+- 50 episodes at 640x360 ≈ 215 MB
 
 ## Notes
 
