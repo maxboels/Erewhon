@@ -131,9 +131,9 @@ class ArduinoReader:
 class CameraCapture:
     """Handles camera frame capture"""
     
-    def __init__(self, camera_id: int = 0, fps: int = 30, resolution: Tuple[int, int] = (320, 240), flip_vertically: bool = False, flip_horizontally: bool = False):
+    def __init__(self, camera_id: int = 0, fps: int = 30, resolution: Tuple[int, int] = (640, 480), flip_vertically: bool = False, flip_horizontally: bool = False):
         self.camera_id = camera_id
-        self.target_fps = fps
+        self.fps = fps
         self.resolution = resolution
         self.flip_vertically = flip_vertically
         self.flip_horizontally = flip_horizontally
@@ -141,6 +141,7 @@ class CameraCapture:
         self.is_capturing = False
         self.capture_thread = None
         self.frame_queue = queue.Queue()
+        self.frame_counter = 0
         
     def initialize(self) -> bool:
         """Initialize camera"""
@@ -211,7 +212,7 @@ class EpisodeRecorder:
     """Coordinates episode recording"""
     
     def __init__(self, output_dir: str, episode_duration: int = 6, action_label: str = "hit red balloon", 
-                 resolution: Tuple[int, int] = (320, 240), jpeg_quality: int = 85):
+                 resolution: Tuple[int, int] = (640, 480), jpeg_quality: int = 85):
         self.output_dir = output_dir
         self.episode_duration = episode_duration
         self.action_label = action_label
@@ -411,7 +412,7 @@ def main():
     parser.add_argument('--arduino-port', type=str, default='/dev/ttyACM0', help='Arduino serial port')
     parser.add_argument('--camera-id', type=int, default=0, help='Camera device ID')
     parser.add_argument('--action-label', type=str, default='hit red balloon', help='Action label for VLA training')
-    parser.add_argument('--resolution', type=str, default='320x240', help='Camera resolution (WxH), e.g., 320x240, 640x480, 224x224')
+    parser.add_argument('--resolution', type=str, default='640x480', help='Camera resolution (WxH), e.g., 320x240, 640x480, 224x224')
     
     args = parser.parse_args()
     
