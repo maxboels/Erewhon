@@ -131,7 +131,7 @@ class ArduinoReader:
 class CameraCapture:
     """Handles camera frame capture"""
     
-    def __init__(self, camera_id: int = 0, fps: int = 30, resolution: Tuple[int, int] = (640, 480), flip_vertically: bool = False, flip_horizontally: bool = False):
+    def __init__(self, camera_id: int = 0, fps: int = 30, resolution: Tuple[int, int] = (640, 360), flip_vertically: bool = False, flip_horizontally: bool = False):
         self.camera_id = camera_id
         self.fps = fps
         self.resolution = resolution
@@ -146,10 +146,16 @@ class CameraCapture:
     def initialize(self) -> bool:
         """Initialize camera"""
         try:
-            self.cap = cv2.VideoCapture(self.camera_id)
-            self.cap.set(cv2.CAP_PROP_FPS, self.fps)
+            # Force V4L2 backend on Linux to avoid GStreamer issues
+            self.cap = cv2.VideoCapture(self.camera_id, cv2.CAP_V4L2)
+            
+            # Set resolution first, then FPS
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
+            self.cap.set(cv2.CAP_PROP_FPS, self.fps)
+            
+            # Set MJPEG format for better compatibility
+            self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
             
             # Test capture
             ret, frame = self.cap.read()
@@ -212,7 +218,7 @@ class EpisodeRecorder:
     """Coordinates episode recording"""
     
     def __init__(self, output_dir: str, episode_duration: int = 6, action_label: str = "hit red balloon", 
-                 resolution: Tuple[int, int] = (640, 480), jpeg_quality: int = 85):
+                 resolution: Tuple[int, int] = (640, 360), jpeg_quality: int = 85):
         self.output_dir = output_dir
         self.episode_duration = episode_duration
         self.action_label = action_label
@@ -412,7 +418,7 @@ def main():
     parser.add_argument('--arduino-port', type=str, default='/dev/ttyACM0', help='Arduino serial port')
     parser.add_argument('--camera-id', type=int, default=0, help='Camera device ID')
     parser.add_argument('--action-label', type=str, default='hit red balloon', help='Action label for VLA training')
-    parser.add_argument('--resolution', type=str, default='640x480', help='Camera resolution (WxH), e.g., 320x240, 640x480, 224x224')
+    parser.add_argument('--resolution', type=str, default='640x360', help='Camera resolution (WxH), e.g., 640x360, 640x480, 1280x720')
     
     args = parser.parse_args()
     

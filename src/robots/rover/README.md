@@ -64,7 +64,8 @@ python3 src/record/episode_recorder.py \
   --output-dir ./episodes \
   --arduino-port /dev/ttyACM0 \
   --camera-id 0 \
-  --action-label "hit red balloon"
+  --action-label "hit red balloon" \
+  --resolution 640x360
 ```
 
 **Parameters:**
@@ -73,6 +74,7 @@ python3 src/record/episode_recorder.py \
 - `--arduino-port`: Arduino serial port (default: /dev/ttyACM0)
 - `--camera-id`: Camera device ID (default: 0)
 - `--action-label`: Task description for VLA training (default: "hit red balloon")
+- `--resolution`: Camera resolution WxH (default: 640x360, options: 640x360, 640x480, 1280x720)
 
 **Examples:**
 ```bash
@@ -84,6 +86,12 @@ python3 src/record/episode_recorder.py --action-label "follow the line"
 
 # Different camera
 python3 src/record/episode_recorder.py --camera-id 1
+
+# Use higher resolution (larger file sizes)
+python3 src/record/episode_recorder.py --resolution 640x480
+
+# Use HD resolution (much larger files, not recommended)
+python3 src/record/episode_recorder.py --resolution 1280x720
 ```
 
 ### 4. Validate & Analyze Episode Data
@@ -295,7 +303,7 @@ Each recorded episode contains:
   "duration": 6.101329803466797,
   "metadata": {
     "camera_fps": 30,
-    "camera_resolution": [640, 480],
+    "camera_resolution": [640, 360],
     "arduino_port": "/dev/ttyACM0",
     "total_control_samples": 288,
     "total_frames": 176
@@ -316,9 +324,10 @@ Each recorded episode contains:
 - **Battery**: Use fully charged battery for consistent throttle range
 - **Lighting**: Collect data in consistent lighting conditions
 - **Driving**: Drive smoothly - the model learns from your style
-- **Storage**: Each 60s episode ≈ 200MB (1800 frames + control data)
+- **Storage**: Each 6s episode ≈ 4.3MB at 640x360 (or ~13MB at 640x480)
 - **Action Labels**: Use descriptive action labels for VLA training
 - **Data Quality**: Always run validation after collecting episodes
+- **Resolution**: 640x360 (default) offers 66% smaller files vs 640x480 with good quality
 
 ## Evaluation Tools
 
