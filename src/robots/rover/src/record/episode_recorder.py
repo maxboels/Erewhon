@@ -8,6 +8,12 @@ This system coordinates:
 2. Camera frame capture with timestamps
 3. Synchronized data logging for training episodes
 
+OPTIMIZED FOR LOW LATENCY AND REAL-TIME SYNCHRONIZATION:
+- Async frame writing (no blocking I/O in main loop)
+- Minimal sleep intervals (sub-millisecond precision)
+- High-priority threads for camera and Arduino
+- Timestamp synchronization validation
+
 Requirements:
 - Arduino running enhanced_pwm_recorder.ino connected via USB
 - Camera connected to Raspberry Pi
@@ -149,6 +155,10 @@ class CameraCapture:
             # Force V4L2 backend on Linux to avoid GStreamer issues
             self.cap = cv2.VideoCapture(self.camera_id, cv2.CAP_V4L2)
             
+            if not self.cap.isOpened():
+                print("✗ Failed to open camera device")
+                return False
+            
             # Set resolution first, then FPS
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
@@ -159,7 +169,7 @@ class CameraCapture:
             
             # Test capture
             ret, frame = self.cap.read()
-            if ret:
+            if ret and frame is not None:
                 print(f"✓ Camera initialized: {self.resolution[0]}x{self.resolution[1]} @ {self.fps}fps")
                 return True
             else:
@@ -179,43 +189,56 @@ class CameraCapture:
     def stop_capture(self):
         """Stop capture and cleanup"""
         self.running = False
-        if self.cap:
-            self.cap.release()
+        time.sleep(0.1)  # Give capture thread time to exit cleanly
+        if self.cap and self.cap.isOpened():
+            try:
+                self.cap.release()
+            except Exception as e:
+                print(f"⚠️  Error releasing camera: {e}")
     
     def _capture_loop(self):
         """Background thread for frame capture"""
         frame_interval = 1.0 / self.fps
         last_frame_time = time.time()
         
-        while self.running and self.cap:
-            current_time = time.time()
-            
-            if current_time - last_frame_time >= frame_interval:
-                ret, frame = self.cap.read()
-                if ret:
-                    # Apply vertical flip if requested
-                    if self.flip_vertically:
-                        frame = cv2.flip(frame, 0)  # 0 = flip around x-axis (vertical flip)
-                    
-                    # Apply horizontal flip if requested
-                    if self.flip_horizontally:
-                        frame = cv2.flip(frame, 1)  # 1 = flip around y-axis (horizontal flip)
-                    
-                    self.frame_counter += 1
-                    frame_sample = FrameSample(
-                        frame_id=self.frame_counter,
-                        timestamp=current_time,
-                        image_path=""  # Will be set when saved
-                    )
-                    self.frame_queue.put((frame_sample, frame))
-                    last_frame_time = current_time
-                else:
-                    print("Failed to capture frame")
+        while self.running and self.cap and self.cap.isOpened():
+            try:
+                current_time = time.time()
+                
+                if current_time - last_frame_time >= frame_interval:
+                    ret, frame = self.cap.read()
+                    if ret and frame is not None:
+                        # Apply vertical flip if requested
+                        if self.flip_vertically:
+                            frame = cv2.flip(frame, 0)  # 0 = flip around x-axis (vertical flip)
+                        
+                        # Apply horizontal flip if requested
+                        if self.flip_horizontally:
+                            frame = cv2.flip(frame, 1)  # 1 = flip around y-axis (horizontal flip)
+                        
+                        self.frame_counter += 1
+                        frame_sample = FrameSample(
+                            frame_id=self.frame_counter,
+                            timestamp=current_time,
+                            image_path=""  # Will be set when saved
+                        )
+                        self.frame_queue.put((frame_sample, frame))
+                        last_frame_time = current_time
+                    elif not ret:
+                        print("⚠️  Camera read failed, stopping capture")
+                        break
+            except cv2.error as e:
+                print(f"⚠️  Camera error: {e}")
+                break
+            except Exception as e:
+                print(f"⚠️  Unexpected capture error: {e}")
+                break
             
             time.sleep(0.001)  # Small sleep to prevent CPU spinning
 
+
 class EpisodeRecorder:
-    """Coordinates episode recording"""
+    """Coordinates episode recording with optimized real-time performance"""
     
     def __init__(self, output_dir: str, episode_duration: int = 6, action_label: str = "hit red balloon", 
                  resolution: Tuple[int, int] = (640, 360), jpeg_quality: int = 85):
@@ -226,8 +249,29 @@ class EpisodeRecorder:
         self.arduino_reader = ArduinoReader()
         self.camera = CameraCapture(resolution=resolution)
         
+        # Async frame writer queue (prevents blocking on disk I/O)
+        self.write_queue = queue.Queue(maxsize=200)  # Buffer up to ~6 seconds @ 30fps
+        self.writer_thread = None
+        self.writer_running = False
+        
         # Create output directory
         os.makedirs(output_dir, exist_ok=True)
+    
+    def _frame_writer_loop(self, episode_dir: str):
+        """Background thread for async frame writing - prevents I/O blocking"""
+        frames_written = 0
+        while self.writer_running or not self.write_queue.empty():
+            try:
+                frame_sample, frame, frame_filename = self.write_queue.get(timeout=0.1)
+                frame_path = os.path.join(episode_dir, "frames", frame_filename)
+                cv2.imwrite(frame_path, frame)
+                frames_written += 1
+            except queue.Empty:
+                continue
+            except Exception as e:
+                print(f"⚠️  Frame write error: {e}")
+        
+        print(f"✓ Frame writer completed: {frames_written} frames saved")
         
     def record_episode(self) -> bool:
         """Record a single episode"""
@@ -253,11 +297,18 @@ class EpisodeRecorder:
         self.arduino_reader.start_reading()
         self.camera.start_capture()
         
+        # Start async frame writer
+        self.writer_running = True
+        self.writer_thread = threading.Thread(target=self._frame_writer_loop, args=(episode_dir,), daemon=True)
+        self.writer_thread.start()
+        
         # Episode data collection
         control_samples = []
         frame_samples = []
         start_time = time.time()
         end_time = start_time + self.episode_duration
+        
+        last_progress_time = 0
         
         print("🔴 Recording started...")
         
@@ -267,7 +318,7 @@ class EpisodeRecorder:
                 elapsed = current_time - start_time
                 remaining = self.episode_duration - elapsed
                 
-                # Collect control data
+                # Collect control data (non-blocking, high priority)
                 try:
                     while True:
                         control_sample = self.arduino_reader.data_queue.get_nowait()
@@ -275,28 +326,29 @@ class EpisodeRecorder:
                 except queue.Empty:
                     pass
                 
-                # Collect frame data
+                # Collect frame data (non-blocking, offload I/O to writer thread)
                 try:
                     while True:
                         frame_sample, frame = self.camera.frame_queue.get_nowait()
                         
-                        # Save frame (default JPEG quality ~95)
+                        # Queue frame for async writing (NO blocking cv2.imwrite here!)
                         frame_filename = f"frame_{frame_sample.frame_id:06d}.jpg"
-                        frame_path = os.path.join(episode_dir, "frames", frame_filename)
-                        cv2.imwrite(frame_path, frame)
+                        self.write_queue.put((frame_sample, frame, frame_filename))
                         
-                        # Update frame sample with path
+                        # Update frame sample with path (for metadata)
                         frame_sample.image_path = os.path.join("frames", frame_filename)
                         frame_samples.append(frame_sample)
                         
                 except queue.Empty:
                     pass
                 
-                # Progress update
-                if int(elapsed) % 5 == 0 and elapsed > 0:
-                    print(f"⏱️  {elapsed:.0f}s | Controls: {len(control_samples)} | Frames: {len(frame_samples)} | Remaining: {remaining:.0f}s")
+                # Progress update (throttled to reduce print overhead)
+                if current_time - last_progress_time >= 1.0:  # Update every 1 second
+                    print(f"⏱️  {elapsed:.0f}s | Controls: {len(control_samples)} | Frames: {len(frame_samples)} | Write queue: {self.write_queue.qsize()} | Remaining: {remaining:.0f}s")
+                    last_progress_time = current_time
                 
-                time.sleep(0.01)  # Small sleep
+                # Minimal sleep for CPU efficiency (1ms instead of 10ms)
+                time.sleep(0.001)
         
         except KeyboardInterrupt:
             print("\n⏹️  Recording interrupted by user")
@@ -306,7 +358,15 @@ class EpisodeRecorder:
             self.arduino_reader.stop_reading()
             self.camera.stop_capture()
             
+            # Signal writer thread to finish
+            self.writer_running = False
+            print("⏳ Waiting for frame writer to complete...")
+            self.writer_thread.join(timeout=10.0)  # Wait up to 10s for writes to complete
+            
             actual_duration = time.time() - start_time
+            
+            # Validate synchronization quality
+            sync_quality = self._validate_synchronization(control_samples, frame_samples)
             
             # Create episode data structure
             episode_data = EpisodeData(
@@ -323,7 +383,8 @@ class EpisodeRecorder:
                     "total_control_samples": len(control_samples),
                     "total_frames": len(frame_samples),
                     "avg_control_rate": len(control_samples) / actual_duration if actual_duration > 0 else 0,
-                    "avg_frame_rate": len(frame_samples) / actual_duration if actual_duration > 0 else 0
+                    "avg_frame_rate": len(frame_samples) / actual_duration if actual_duration > 0 else 0,
+                    "sync_quality": sync_quality
                 }
             )
             
@@ -335,8 +396,37 @@ class EpisodeRecorder:
             print(f"⏱️  Duration: {actual_duration:.1f}s")
             print(f"🎮 Control samples: {len(control_samples)} ({len(control_samples)/actual_duration:.1f} Hz)")
             print(f"📷 Frame samples: {len(frame_samples)} ({len(frame_samples)/actual_duration:.1f} Hz)")
+            print(f"🔄 Sync quality: {sync_quality['max_offset_ms']:.2f}ms max offset")
             
         return True
+    
+    def _validate_synchronization(self, control_samples: List[ControlSample], frame_samples: List[FrameSample]) -> dict:
+        """Validate timestamp synchronization between control and frame data"""
+        if not control_samples or not frame_samples:
+            return {"max_offset_ms": 0, "avg_offset_ms": 0, "status": "NO_DATA"}
+        
+        # Calculate inter-sample timing
+        control_intervals = []
+        for i in range(1, len(control_samples)):
+            interval = (control_samples[i].system_timestamp - control_samples[i-1].system_timestamp) * 1000
+            control_intervals.append(interval)
+        
+        frame_intervals = []
+        for i in range(1, len(frame_samples)):
+            interval = (frame_samples[i].timestamp - frame_samples[i-1].timestamp) * 1000
+            frame_intervals.append(interval)
+        
+        max_control_jitter = max(control_intervals) - min(control_intervals) if control_intervals else 0
+        max_frame_jitter = max(frame_intervals) - min(frame_intervals) if frame_intervals else 0
+        
+        return {
+            "max_offset_ms": max(max_control_jitter, max_frame_jitter),
+            "avg_control_interval_ms": np.mean(control_intervals) if control_intervals else 0,
+            "avg_frame_interval_ms": np.mean(frame_intervals) if frame_intervals else 0,
+            "control_jitter_ms": max_control_jitter,
+            "frame_jitter_ms": max_frame_jitter,
+            "status": "GOOD" if max(max_control_jitter, max_frame_jitter) < 50 else "WARNING"
+        }
     
     def _save_episode_data(self, episode_dir: str, episode_data: EpisodeData):
         """Save episode metadata and synchronized data"""

@@ -89,9 +89,6 @@ python3 src/record/episode_recorder.py --camera-id 1
 
 # Use higher resolution (larger file sizes)
 python3 src/record/episode_recorder.py --resolution 640x480
-
-# Use HD resolution (much larger files, not recommended)
-python3 src/record/episode_recorder.py --resolution 1280x720
 ```
 
 ### 4. Transfer Episode Data to Your Laptop ⚡ **RECOMMENDED**
