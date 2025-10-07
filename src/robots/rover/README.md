@@ -60,7 +60,7 @@ python3 src/record/episode_recorder.py
 **Full command with all options:**
 ```bash
 python3 src/record/episode_recorder.py \
-  --episode-duration 15 \
+  --episode-duration 6 \
   --output-dir ./episodes \
   --arduino-port /dev/ttyACM0 \
   --camera-id 0 \
@@ -68,7 +68,7 @@ python3 src/record/episode_recorder.py \
 ```
 
 **Parameters:**
-- `--episode-duration`: Recording length in seconds (default: 15)
+- `--episode-duration`: Recording length in seconds (default: 6)
 - `--output-dir`: Where to save episodes (default: ./episodes)
 - `--arduino-port`: Arduino serial port (default: /dev/ttyACM0)
 - `--camera-id`: Camera device ID (default: 0)

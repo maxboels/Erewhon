@@ -210,7 +210,7 @@ class CameraCapture:
 class EpisodeRecorder:
     """Coordinates episode recording"""
     
-    def __init__(self, output_dir: str, episode_duration: int = 15, action_label: str = "hit red balloon"):
+    def __init__(self, output_dir: str, episode_duration: int = 6, action_label: str = "hit red balloon"):
         self.output_dir = output_dir
         self.episode_duration = episode_duration
         self.action_label = action_label
@@ -404,7 +404,7 @@ class EpisodeRecorder:
 
 def main():
     parser = argparse.ArgumentParser(description='RC Car Episode Data Collector')
-    parser.add_argument('--episode-duration', type=int, default=15, help='Episode duration in seconds')
+    parser.add_argument('--episode-duration', type=int, default=6, help='Episode duration in seconds')
     parser.add_argument('--output-dir', type=str, default='./episodes', help='Output directory for episodes')
     parser.add_argument('--arduino-port', type=str, default='/dev/ttyACM0', help='Arduino serial port')
     parser.add_argument('--camera-id', type=int, default=0, help='Camera device ID')

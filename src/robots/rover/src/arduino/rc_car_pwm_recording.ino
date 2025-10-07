@@ -31,13 +31,15 @@ volatile bool steering_newCycle = false;
 
 // -------------------- Calibration Constants --------------------
 // Throttle: 900Hz PWM, 0-70% duty cycle
-const float THROTTLE_MIN_DUTY = 0.0;
-const float THROTTLE_MAX_DUTY = 70.0;
-const float THROTTLE_NEUTRAL_DUTY = 0.0;  // 0% = stopped
+// UPDATED 2025-10-07: Measured actual stopped throttle = 11.81% duty (120μs @ 1016μs period)
+const float THROTTLE_MIN_DUTY = 11.81;    // 11.81% = stopped (measured)
+const float THROTTLE_MAX_DUTY = 70.0;     // 70% = full throttle
+const float THROTTLE_NEUTRAL_DUTY = 11.81;  // Same as min for stopped
 
 // Steering: 50Hz PWM, 5-9.2% duty cycle  
+// UPDATED 2025-10-07: Measured actual center = 6.83% duty (1456μs @ 21316μs period)
 const float STEERING_MIN_DUTY = 5.0;      // 5% = Full Left
-const float STEERING_NEUTRAL_DUTY = 7.0;  // 7% = Straight
+const float STEERING_NEUTRAL_DUTY = 6.83; // 6.83% = Straight (measured)
 const float STEERING_MAX_DUTY = 9.2;      // 9.2% = Full Right
 
 // -------------------- Setup --------------------
@@ -130,8 +132,10 @@ float calculateThrottleNormalized(unsigned long pulseWidth, unsigned long period
   // Calculate duty cycle percentage
   float dutyCycle = ((float)pulseWidth / (float)period) * 100.0;
   
-  // Map 0-70% duty to 0.0-1.0 normalized (0.0 = stopped, 1.0 = full throttle)
-  float normalized = dutyCycle / THROTTLE_MAX_DUTY;
+  // Map throttle range to 0.0-1.0 normalized
+  // THROTTLE_NEUTRAL_DUTY (11.81%) = 0.0 (stopped)
+  // THROTTLE_MAX_DUTY (70%) = 1.0 (full throttle)
+  float normalized = (dutyCycle - THROTTLE_NEUTRAL_DUTY) / (THROTTLE_MAX_DUTY - THROTTLE_NEUTRAL_DUTY);
   return constrain(normalized, 0.0, 1.0);
 }
 
