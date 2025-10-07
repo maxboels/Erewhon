@@ -131,16 +131,16 @@ class ArduinoReader:
 class CameraCapture:
     """Handles camera frame capture"""
     
-    def __init__(self, camera_id: int = 0, fps: int = 30, resolution: Tuple[int, int] = (640, 480), flip_vertically: bool = False, flip_horizontally: bool = False):
+    def __init__(self, camera_id: int = 0, fps: int = 30, resolution: Tuple[int, int] = (320, 240), flip_vertically: bool = False, flip_horizontally: bool = False):
         self.camera_id = camera_id
-        self.fps = fps
+        self.target_fps = fps
         self.resolution = resolution
         self.flip_vertically = flip_vertically
         self.flip_horizontally = flip_horizontally
-        self.cap = None
-        self.running = False
+        self.camera = None
+        self.is_capturing = False
+        self.capture_thread = None
         self.frame_queue = queue.Queue()
-        self.frame_counter = 0
         
     def initialize(self) -> bool:
         """Initialize camera"""
@@ -210,12 +210,14 @@ class CameraCapture:
 class EpisodeRecorder:
     """Coordinates episode recording"""
     
-    def __init__(self, output_dir: str, episode_duration: int = 6, action_label: str = "hit red balloon"):
+    def __init__(self, output_dir: str, episode_duration: int = 6, action_label: str = "hit red balloon", 
+                 resolution: Tuple[int, int] = (320, 240), jpeg_quality: int = 85):
         self.output_dir = output_dir
         self.episode_duration = episode_duration
         self.action_label = action_label
+        self.jpeg_quality = jpeg_quality
         self.arduino_reader = ArduinoReader()
-        self.camera = CameraCapture()
+        self.camera = CameraCapture(resolution=resolution)
         
         # Create output directory
         os.makedirs(output_dir, exist_ok=True)
@@ -271,7 +273,7 @@ class EpisodeRecorder:
                     while True:
                         frame_sample, frame = self.camera.frame_queue.get_nowait()
                         
-                        # Save frame
+                        # Save frame (default JPEG quality ~95)
                         frame_filename = f"frame_{frame_sample.frame_id:06d}.jpg"
                         frame_path = os.path.join(episode_dir, "frames", frame_filename)
                         cv2.imwrite(frame_path, frame)
@@ -409,8 +411,17 @@ def main():
     parser.add_argument('--arduino-port', type=str, default='/dev/ttyACM0', help='Arduino serial port')
     parser.add_argument('--camera-id', type=int, default=0, help='Camera device ID')
     parser.add_argument('--action-label', type=str, default='hit red balloon', help='Action label for VLA training')
+    parser.add_argument('--resolution', type=str, default='320x240', help='Camera resolution (WxH), e.g., 320x240, 640x480, 224x224')
     
     args = parser.parse_args()
+    
+    # Parse resolution
+    try:
+        width, height = map(int, args.resolution.split('x'))
+        resolution = (width, height)
+    except ValueError:
+        print(f"Error: Invalid resolution format '{args.resolution}'. Use WxH format (e.g., 320x240)")
+        return 1
     
     print("RC Car Imitation Learning Data Collector")
     print("=" * 40)
@@ -418,12 +429,14 @@ def main():
     print(f"Output Directory: {args.output_dir}")
     print(f"Arduino Port: {args.arduino_port}")
     print(f"Camera ID: {args.camera_id}")
+    print(f"Resolution: {resolution[0]}x{resolution[1]}")
     print(f"Action Label: {args.action_label}")
     
     recorder = EpisodeRecorder(
         output_dir=args.output_dir,
         episode_duration=args.episode_duration,
-        action_label=args.action_label
+        action_label=args.action_label,
+        resolution=resolution
     )
     
     # Update Arduino reader and camera settings if provided
