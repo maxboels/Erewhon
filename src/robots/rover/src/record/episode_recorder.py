@@ -137,12 +137,10 @@ class ArduinoReader:
 class CameraCapture:
     """Handles camera frame capture"""
     
-    def __init__(self, camera_id: int = 0, fps: int = 30, resolution: Tuple[int, int] = (640, 360), flip_vertically: bool = False, flip_horizontally: bool = False):
+    def __init__(self, camera_id: int = 0, fps: int = 30, resolution: Tuple[int, int] = (640, 360)):
         self.camera_id = camera_id
         self.fps = fps
         self.resolution = resolution
-        self.flip_vertically = flip_vertically
-        self.flip_horizontally = flip_horizontally
         self.camera = None
         self.is_capturing = False
         self.capture_thread = None
@@ -208,14 +206,6 @@ class CameraCapture:
                 if current_time - last_frame_time >= frame_interval:
                     ret, frame = self.cap.read()
                     if ret and frame is not None:
-                        # Apply vertical flip if requested
-                        if self.flip_vertically:
-                            frame = cv2.flip(frame, 0)  # 0 = flip around x-axis (vertical flip)
-                        
-                        # Apply horizontal flip if requested
-                        if self.flip_horizontally:
-                            frame = cv2.flip(frame, 1)  # 1 = flip around y-axis (horizontal flip)
-                        
                         self.frame_counter += 1
                         frame_sample = FrameSample(
                             frame_id=self.frame_counter,
@@ -343,8 +333,8 @@ class EpisodeRecorder:
                     pass
                 
                 # Progress update (throttled to reduce print overhead)
-                if current_time - last_progress_time >= 1.0:  # Update every 1 second
-                    print(f"⏱️  {elapsed:.0f}s | Controls: {len(control_samples)} | Frames: {len(frame_samples)} | Write queue: {self.write_queue.qsize()} | Remaining: {remaining:.0f}s")
+                if current_time - last_progress_time >= 0.1:  # Update every 0.1 seconds (10 Hz)
+                    print(f"⏱️  {elapsed:.1f}s | Controls: {len(control_samples)} | Frames: {len(frame_samples)} | Write queue: {self.write_queue.qsize()} | Remaining: {remaining:.1f}s")
                     last_progress_time = current_time
                 
                 # Minimal sleep for CPU efficiency (1ms instead of 10ms)
@@ -539,8 +529,6 @@ def main():
     # Update Arduino reader and camera settings if provided
     recorder.arduino_reader.port = args.arduino_port
     recorder.camera.camera_id = args.camera_id
-    recorder.camera.flip_vertically = False # Default to True for upside-down mounting
-    recorder.camera.flip_horizontally = False # Default to True for horizontal flip
     
     try:
         episode_num = 1
