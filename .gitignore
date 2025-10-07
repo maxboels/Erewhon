@@ -37,7 +37,8 @@ ENV/
 Thumbs.db
 
 # Project specific
-# episodes/
+episodes/episode_*/frames/
+src/robots/rover/episodes/episode_*/frames/frame_*.jpg
 *.log
 
 # Private documentation with sensitive info
