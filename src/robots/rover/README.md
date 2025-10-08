@@ -343,8 +343,25 @@ sudo apt-get install python3-opencv
    - Generates quality report
 5. **Clean (optional)** → Run `clean_episode_data.py` to remove anomalies
 6. **Analyze** → Use `pwm_statistics.py` and `episode_analyzer.py` for insights
-7. **Train** → Train ML model on collected data
-8. **Deploy** → Run inference on Raspberry Pi
+7. **Train** → Train state-aware ACT model on collected data
+   ```bash
+   # Train using BOTH camera frames AND current state
+   cd ../../policies/ACT
+   python3 state_aware_act_trainer.py \
+     --data_dir ../../robots/rover/episodes \
+     --max_epochs 50 \
+     --device cuda
+   
+   # See QUICK_COMMANDS.md for full guide
+   ```
+8. **Test Inference** → Validate model on episode data
+   ```bash
+   python3 state_aware_inference.py \
+     --model outputs/state_aware_act_XXX/best_model.pth \
+     --episode ../../robots/rover/episodes/episode_XXX \
+     --device cuda
+   ```
+9. **Deploy** → Run autonomous control on Raspberry Pi
 
 ## Episode Data Structure
 

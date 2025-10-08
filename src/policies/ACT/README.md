@@ -1,12 +1,66 @@
-# ACT Policy for Imitation Learning
+# ACT Policy Implementation for Tracer RC Car
 
-> **Action Chunking Transformer (ACT) implementation for autonomous RC car navigation**
+This directory contains the Action Chunking with Transformers (ACT) implementation for autonomous RC car control.
 
-This directory contains ACT-specific training, inference, and testing tools built on top of the LeRobot framework.
+## ⚠️ **IMPORTANT: Use State-Aware Training!**
 
-## 📁 Directory Structure
+Your RC car's brain needs **BOTH** camera observations **AND** current vehicle state (steering, throttle) to make good decisions!
 
-### Training Files
+### ✅ **Correct Scripts to Use:**
+- **`state_aware_act_trainer.py`** - Training with image + state ✅
+- **`state_aware_inference.py`** - Inference with state tracking ✅
+
+### ❌ **Old Scripts (Don't Use):**
+- ~~`simple_act_trainer.py`~~ - Image-only (no state) ❌
+- ~~`enhanced_act_trainer.py`~~ - Image-only (no state) ❌
+- ~~`test_inference.py`~~ - Image-only (no state) ❌
+
+**Why?** Image-only models produce jerky, unstable control because they don't know the vehicle's current state!
+
+---
+
+## � Quick Start
+
+### 1. Train State-Aware Model
+```bash
+python3 state_aware_act_trainer.py \
+  --data_dir ../../robots/rover/episodes \
+  --max_epochs 50 \
+  --batch_size 8 \
+  --device cuda
+```
+
+### 2. Test Inference
+```bash
+python3 state_aware_inference.py \
+  --model outputs/state_aware_act_XXXXXX/best_model.pth \
+  --episode ../../robots/rover/episodes/episode_XXXXXX \
+  --device cuda
+```
+
+### 3. Read the Guides
+- **`VISUAL_GUIDE.md`** - 📊 Visual explanation of what changed
+- **`STATE_AWARE_IMPLEMENTATION.md`** - 📋 Complete implementation summary
+- **`STATE_AWARE_TRAINING_GUIDE.md`** - 📚 Detailed training guide
+- **`QUICK_COMMANDS.md`** - ⚡ Quick command reference
+- **`STATE_INPUT_ANALYSIS.md`** - 🔬 Technical analysis
+- **`RESOLUTION_CONFIG.md`** - 📐 Image resolution configuration
+
+---
+
+## �📁 Directory Structure
+
+### State-Aware Implementation (NEW) ✅
+- **`state_aware_act_trainer.py`** - State-aware training script
+- **`state_aware_inference.py`** - State-aware inference script
+- **`VISUAL_GUIDE.md`** - Visual explanation of changes
+- **`STATE_AWARE_IMPLEMENTATION.md`** - Implementation summary
+- **`STATE_AWARE_TRAINING_GUIDE.md`** - Complete training guide
+- **`QUICK_COMMANDS.md`** - Quick reference commands
+- **`STATE_INPUT_ANALYSIS.md`** - Technical analysis
+- **`RESOLUTION_CONFIG.md`** - Resolution configuration
+
+### Training Files (Legacy)
 - `enhanced_act_trainer.py` - Enhanced ACT trainer with advanced features
 - `hybrid_lerobot_trainer.py` - Hybrid training approach
 - `official_act_trainer.py` - Official ACT implementation trainer
