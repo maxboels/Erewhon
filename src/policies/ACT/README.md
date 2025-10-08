@@ -1,4 +1,68 @@
-# ACT Policy Implementation for Tracer RC Car
+# ACT (Action Chunking Transformer) Policy for RC Car
+
+**⚠️ IMPORTANT: Now using Full LeRobot ACT Implementation!**
+
+---
+
+## 🚀 Quick Start
+
+**We now use the official LeRobot ACT architecture** with configuration for RC car control.
+
+### Training:
+```bash
+python official_lerobot_trainer.py \
+    --data_dir ../../episodes \
+    --output_dir ./outputs/lerobot_act \
+    --epochs 100 \
+    --batch_size 16 \
+    --device cuda
+```
+
+### Inference:
+```bash
+python lerobot_act_inference.py \
+    --checkpoint outputs/lerobot_act/best_model.pth \
+    --test_image test.jpg
+```
+
+---
+
+## 📚 Documentation
+
+**Start here:**
+- 📖 **[README_LEROBOT_ACT.md](README_LEROBOT_ACT.md)** - Complete guide
+- ⚡ **[QUICKSTART_LEROBOT.md](QUICKSTART_LEROBOT.md)** - Quick commands
+- ✅ **[FINAL_SUMMARY.md](FINAL_SUMMARY.md)** - Migration summary
+
+**Why full LeRobot ACT?**
+- ✅ Pre-trained ResNet18 (ImageNet weights)
+- ✅ VAE for better generalization
+- ✅ 13.5M parameters (vs 3.5M simplified)
+- ✅ Official implementation, community support
+
+---
+
+## 🗂️ File Structure
+
+### ✅ Active (Use These):
+```
+├── official_lerobot_trainer.py      # Main training script
+├── lerobot_act_inference.py         # Inference wrapper
+├── README_LEROBOT_ACT.md            # Full documentation
+└── lerobot/                          # Official LeRobot code
+```
+
+### ❌ Deprecated (Old):
+```
+└── deprecated/
+    ├── state_aware_act_trainer.py
+    ├── simple_act_trainer.py
+    └── enhanced_act_trainer.py
+```
+
+---
+
+## 🎯 ACT Policy for RC Car
 
 This directory contains the Action Chunking with Transformers (ACT) implementation for autonomous RC car control.
 

@@ -39,6 +39,7 @@ except ImportError as e:
     sys.exit(1)
 
 # Import our local dataset loader
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "datasets"))
 from local_dataset_loader import TracerLocalDataset
 
 # Setup logging
@@ -194,8 +195,17 @@ class OfficialLeRobotACTTrainer:
         """Setup official LeRobot ACT model"""
         logger.info("🤖 Setting up official LeRobot ACT model...")
         
-        # Create ACT configuration
+        # Create ACT configuration for RC car
         act_config = ACTConfig(
+            # Input/Output shapes for RC car
+            input_shapes={
+                "observation.images.cam_front": [3, self.config['image_height'], self.config['image_width']],
+                "observation.state": [2],  # [steering, throttle]
+            },
+            output_shapes={
+                "action": [2],  # [steering, throttle] PWM outputs
+            },
+            
             # Observation configuration
             n_obs_steps=self.config['n_obs_steps'],
             
@@ -212,9 +222,13 @@ class OfficialLeRobotACTTrainer:
             dropout=self.config['dropout'],
             kl_weight=self.config['kl_weight'],
             
-            # Vision encoder
+            # Vision encoder - use pre-trained ResNet18!
             vision_backbone=self.config['vision_encoder'],
             pretrained_backbone_weights="ResNet18_Weights.IMAGENET1K_V1" if self.config['pretrained_backbone'] else None,
+            
+            # VAE for stochastic policy
+            use_vae=True,
+            latent_dim=32,
             
             # Device
             device=self.device,
@@ -271,10 +285,9 @@ class OfficialLeRobotACTTrainer:
                 else:
                     batch[key] = batch[key].to(self.device)
             
-            # Forward pass
+            # Forward pass - LeRobot ACT returns (loss, loss_dict)
             self.optimizer.zero_grad()
-            output = self.policy(batch)
-            loss = output['loss']
+            loss, loss_dict = self.policy(batch)
             
             # Backward pass
             loss.backward()
@@ -317,9 +330,8 @@ class OfficialLeRobotACTTrainer:
                     else:
                         batch[key] = batch[key].to(self.device)
                 
-                # Forward pass
-                output = self.policy(batch)
-                loss = output['loss']
+                # Forward pass - LeRobot ACT returns (loss, loss_dict)
+                loss, loss_dict = self.policy(batch)
                 val_losses.append(loss.item())
         
         return np.mean(val_losses)
@@ -399,7 +411,7 @@ def get_lerobot_config() -> Dict[str, Any]:
         
         # Image settings (matching your data)
         'image_width': 640,
-        'image_height': 480,
+        'image_height': 360,  # Actual RC car data resolution
         
         # ACT model configuration
         'n_obs_steps': 1,

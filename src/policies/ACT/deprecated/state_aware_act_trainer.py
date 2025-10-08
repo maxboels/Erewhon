@@ -101,7 +101,7 @@ class StateAwareACTModel(nn.Module):
     
     def __init__(
         self,
-        image_size: Tuple[int, int] = (480, 640),
+        image_size: Tuple[int, int] = (360, 640),  # Actual data: 640x360 (W×H) = (360,640) in PyTorch (H×W)
         state_dim: int = 2,  # [steering, throttle]
         action_dim: int = 2,
         hidden_dim: int = 512,
@@ -115,30 +115,30 @@ class StateAwareACTModel(nn.Module):
         self.action_dim = action_dim
         self.chunk_size = chunk_size
         
-        # Vision encoder (CNN for images)
+        # Vision encoder (CNN for images - optimized for 640x360 input)
         self.vision_encoder = nn.Sequential(
-            nn.Conv2d(3, 32, 7, stride=2, padding=3),  # 480x640 -> 240x320
+            nn.Conv2d(3, 32, 7, stride=2, padding=3),  # 360x640 -> 180x320
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(3, stride=2, padding=1),      # 240x320 -> 120x160
+            nn.MaxPool2d(3, stride=2, padding=1),      # 180x320 -> 90x160
             
             nn.Conv2d(32, 64, 3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),                           # 120x160 -> 60x80
+            nn.MaxPool2d(2),                           # 90x160 -> 45x80
             
             nn.Conv2d(64, 128, 3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),                           # 60x80 -> 30x40
+            nn.MaxPool2d(2),                           # 45x80 -> 22x40
             
             nn.Conv2d(128, 256, 3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool2d((8, 10)),             # -> 8x10
+            nn.AdaptiveAvgPool2d((6, 10)),             # -> 6x10 for 360 height
             
             nn.Flatten(),
-            nn.Linear(256 * 8 * 10, hidden_dim),
+            nn.Linear(256 * 6 * 10, hidden_dim),       # Adjusted for 360 height
             nn.ReLU(inplace=True),
             nn.Dropout(0.1)
         )
@@ -324,12 +324,12 @@ class StateAwareACTTrainer:
         )
         
         logger.info(f"Dataset split: {len(self.train_dataset)} train, {len(self.val_dataset)} validation")
-        logger.info(f"Using full resolution: 480x640 pixels with state input")
+        logger.info(f"Using actual resolution: 360x640 pixels (H×W) with state input")
     
     def setup_model(self):
         """Setup the state-aware model"""
         self.model = StateAwareACTModel(
-            image_size=(480, 640),
+            image_size=(360, 640),  # Actual data resolution (H×W)
             state_dim=2,  # [steering, throttle]
             action_dim=2,
             hidden_dim=self.config['hidden_dim'],
@@ -443,7 +443,7 @@ class StateAwareACTTrainer:
         """Main training loop"""
         logger.info("🚀 Starting state-aware ACT training...")
         logger.info(f"Training for {self.config['max_epochs']} epochs")
-        logger.info(f"Model receives: Image (640x480) + Current State [steering, throttle]")
+        logger.info(f"Model receives: Image (640x360) + Current State [steering, throttle]")
         
         for epoch in range(self.config['max_epochs']):
             # Train

@@ -102,10 +102,12 @@ class TracerLocalDataset(Dataset):
             control_samples.sort(key=lambda x: x['system_timestamp'])
             
             # For each frame, find the closest control sample
-            for frame_sample in frame_samples:
+            previous_control = None  # Track previous action for state
+            
+            for i, frame_sample in enumerate(frame_samples):
                 frame_time = frame_sample['timestamp']
                 
-                # Find closest control sample
+                # Find closest control sample for current action
                 best_control = None
                 min_time_diff = float('inf')
                 
@@ -117,16 +119,33 @@ class TracerLocalDataset(Dataset):
                 
                 # Only include if within tolerance
                 if best_control and min_time_diff <= self.sync_tolerance:
+                    # Determine state (previous action) vs action (current)
+                    if i == 0:
+                        # First frame: use neutral state or current action
+                        state_steering = 0.0  # Neutral steering
+                        state_throttle = 0.0  # Neutral throttle
+                    else:
+                        # Use previous action as current state
+                        state_steering = previous_control['steering_normalized']
+                        state_throttle = previous_control['throttle_normalized']
+                    
                     synchronized_sample = {
                         'episode_id': episode['episode_id'],
                         'frame_id': frame_sample['frame_id'],
                         'image_path': frame_sample['image_path'],
                         'timestamp': frame_time,
-                        'steering': best_control['steering_normalized'],
-                        'throttle': best_control['throttle_normalized'],
+                        # State: where the robot WAS (previous action)
+                        'state_steering': state_steering,
+                        'state_throttle': state_throttle,
+                        # Action: what the robot DID (current control)
+                        'action_steering': best_control['steering_normalized'],
+                        'action_throttle': best_control['throttle_normalized'],
                         'time_sync_error': min_time_diff
                     }
                     synchronized_samples.append(synchronized_sample)
+                    
+                    # Update previous control for next iteration
+                    previous_control = best_control
             
             # Optionally limit episode length
             if self.episode_length and len(synchronized_samples) > self.episode_length:
@@ -152,7 +171,7 @@ class TracerLocalDataset(Dataset):
         return len(self.synchronized_data)
     
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        """Get a single sample from the dataset"""
+        """Get a single sample from the dataset in LeRobot format"""
         sample = self.synchronized_data[idx]
         
         try:
@@ -162,26 +181,28 @@ class TracerLocalDataset(Dataset):
             if self.transforms:
                 image = self.transforms(image)
             else:
-                # Default transforms: resize and normalize
-                image = image.resize((640, 480))
+                # Default transforms: resize to 360x640 and normalize
+                image = image.resize((640, 360))  # Note: PIL uses (width, height)
                 image = torch.tensor(np.array(image), dtype=torch.float32) / 255.0
                 image = image.permute(2, 0, 1)  # HWC to CHW
             
-            # Prepare control actions
-            action = torch.tensor([
-                sample['steering'],
-                sample['throttle']
+            # Prepare state (previous robot state - where we WERE)
+            state = torch.tensor([
+                sample['state_steering'],
+                sample['state_throttle']
             ], dtype=torch.float32)
             
-            # Create observation dict matching LeRobot format
-            observation = {
-                'image_front': image,
-                'state': action,  # Current state (for state-action pairs)
-            }
+            # Prepare action (current action - what we DID for this observation)
+            action = torch.tensor([
+                sample['action_steering'],
+                sample['action_throttle']
+            ], dtype=torch.float32)
             
+            # Return in LeRobot format
             return {
-                'observation': observation,
-                'action': action,
+                'observation.images.cam_front': image,  # [3, 360, 640]
+                'observation.state': state,              # [2] - current state
+                'action': action,                        # [2] - target action
                 'episode_id': sample['episode_id'],
                 'frame_id': sample['frame_id'],
                 'timestamp': sample['timestamp']
@@ -190,18 +211,37 @@ class TracerLocalDataset(Dataset):
         except Exception as e:
             logger.error(f"Error loading sample {idx}: {e}")
             # Return a dummy sample to avoid training interruption
-            dummy_image = torch.zeros(3, 480, 640, dtype=torch.float32)
+            dummy_image = torch.zeros(3, 360, 640, dtype=torch.float32)
             dummy_action = torch.zeros(2, dtype=torch.float32)
             return {
-                'observation': {
-                    'image_front': dummy_image,
-                    'state': dummy_action,
-                },
+                'observation.images.cam_front': dummy_image,
+                'observation.state': dummy_action,
                 'action': dummy_action,
                 'episode_id': 'dummy',
                 'frame_id': 0,
                 'timestamp': 0.0
             }
+
+def lerobot_collate_fn(batch):
+    """Custom collate function for LeRobot ACT that adds action_is_pad mask"""
+    # Stack all tensors
+    collated = {}
+    
+    # Get first sample to determine keys
+    for key in batch[0].keys():
+        if key in ['episode_id', 'frame_id', 'timestamp']:
+            # Don't collate metadata
+            continue
+            
+        if isinstance(batch[0][key], torch.Tensor):
+            collated[key] = torch.stack([item[key] for item in batch])
+    
+    # Add action_is_pad mask (all False since we have real data)
+    # LeRobot ACT expects this for handling variable-length episodes
+    batch_size = len(batch)
+    collated['action_is_pad'] = torch.zeros(batch_size, dtype=torch.bool)
+    
+    return collated
 
 def create_data_loaders(
     data_dir: str,
@@ -225,13 +265,14 @@ def create_data_loaders(
         full_dataset, [train_size, val_size]
     )
     
-    # Create data loaders
+    # Create data loaders with custom collate function
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
-        pin_memory=True
+        pin_memory=True,
+        collate_fn=lerobot_collate_fn
     )
     
     val_loader = torch.utils.data.DataLoader(
@@ -239,7 +280,8 @@ def create_data_loaders(
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True
+        pin_memory=True,
+        collate_fn=lerobot_collate_fn
     )
     
     return train_loader, val_loader
