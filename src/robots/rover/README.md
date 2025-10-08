@@ -37,9 +37,27 @@ End-to-end system for training an RC car to drive autonomously using imitation l
 ```
 
 ### 2. Validate System ⚠️ **DO THIS FIRST!**
+
+**Option A: Real-Time PWM Monitor (Recommended for Testing)**
 ```bash
-# Run comprehensive validation tool
-python3 src/debug/pwm_calibration_validator.py \
+# Live visualization of PWM signals with graphs
+python3 src/eval/realtime_pwm_monitor.py --arduino-port /dev/ttyACM0
+
+# Shows:
+# - Raw PWM values (microseconds)
+# - Normalized values (-1.0 to 1.0)
+# - Live graphs with 10-second history
+# - Statistics and calibration info
+# - Duty cycle calculations
+
+# Controls:
+# [Q] Quit  |  [R] Reset  |  [S] Screenshot  |  [C] Calibration Info
+```
+
+**Option B: Comprehensive Validation Tool**
+```bash
+# Run full validation suite
+python3 src/eval/pwm_calibration_validator.py \
   --arduino-port /dev/ttyACM0 \
   --camera-id 0
 

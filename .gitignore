@@ -38,6 +38,7 @@ Thumbs.db
 
 # Project specific
 episodes/episode_*/frames/
+episodes/
 src/robots/rover/episodes/episode_*/frames/frame_*.jpg
 episode_animations/
 *.log
