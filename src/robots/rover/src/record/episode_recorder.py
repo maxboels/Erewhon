@@ -178,6 +178,16 @@ class CameraCapture:
             print(f"✗ Camera initialization failed: {e}")
             return False
     
+    def reset_for_new_episode(self):
+        """Reset frame counter and clear queue for new episode"""
+        self.frame_counter = 0
+        # Clear any stale frames from previous episode
+        while not self.frame_queue.empty():
+            try:
+                self.frame_queue.get_nowait()
+            except queue.Empty:
+                break
+    
     def start_capture(self):
         """Start capturing frames in background thread"""
         self.running = True
@@ -282,6 +292,16 @@ class EpisodeRecorder:
             
         if not self.camera.initialize():
             return False
+        
+        # Reset frame counter and clear queues for new episode
+        self.camera.reset_for_new_episode()
+        
+        # Clear any stale control data from previous episode
+        while not self.arduino_reader.data_queue.empty():
+            try:
+                self.arduino_reader.data_queue.get_nowait()
+            except queue.Empty:
+                break
         
         # Start data collection
         self.arduino_reader.start_reading()
