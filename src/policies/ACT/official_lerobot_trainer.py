@@ -22,6 +22,7 @@ from datetime import datetime
 import csv
 from PIL import Image
 import time
+from tqdm import tqdm
 
 # Setup LeRobot imports
 sys.path.insert(0, str(Path(__file__).parent / "lerobot" / "src"))
@@ -67,17 +68,20 @@ class CSVLogger:
             writer.writerow(['epoch', 'train_loss', 'val_loss', 'best_val_loss', 'learning_rate', 
                            'epoch_time', 'total_samples', 'timestamp'])
     
-    def log_batch(self, step: int, epoch: int, batch_loss: float, learning_rate: float):
-        with open(self.batch_log_file, 'a', newline='') as f:
+    def log_batch(self, step, epoch, batch_loss, learning_rate):
+        """Log batch-level metrics"""
+        with open(self.batch_metrics_file, 'a', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([step, epoch, batch_loss, learning_rate, datetime.now().isoformat()])
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            writer.writerow([step, epoch, batch_loss, learning_rate, timestamp])
     
-    def log_epoch(self, epoch: int, train_loss: float, val_loss: float, best_val_loss: float, 
-                  learning_rate: float, epoch_time: float, total_samples: int):
-        with open(self.epoch_log_file, 'a', newline='') as f:
+    def log_epoch(self, epoch, train_loss, val_loss, best_val_loss, learning_rate, epoch_time, total_samples):
+        """Log epoch-level metrics"""
+        with open(self.epoch_metrics_file, 'a', newline='') as f:
             writer = csv.writer(f)
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             writer.writerow([epoch, train_loss, val_loss, best_val_loss, learning_rate, 
-                           epoch_time, total_samples, datetime.now().isoformat()])
+                           epoch_time, total_samples, timestamp])
 
 def lerobot_collate_fn(batch):
     """Custom collate function for LeRobot ACT - formats batch correctly"""
@@ -290,7 +294,13 @@ class OfficialLeRobotACTTrainer:
         
         total_batches = len(self.train_loader)
         
-        for batch_idx, batch in enumerate(self.train_loader):
+        # Create progress bar
+        pbar = tqdm(self.train_loader, 
+                   desc=f"Epoch {epoch+1}/{self.config['num_epochs']}", 
+                   ncols=120,
+                   bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] Loss: {postfix}')
+        
+        for batch_idx, batch in enumerate(pbar):
             # Move tensors to device (skip non-tensor fields like episode_id, frame_id, timestamp)
             tensor_keys = ['observation.images.cam_front', 'observation.state', 'action', 'action_is_pad']
             for key in tensor_keys:
@@ -312,18 +322,13 @@ class OfficialLeRobotACTTrainer:
             # Logging
             epoch_losses.append(loss.item())
             
-            # Progress logging - every 10 batches or at the end
-            if batch_idx % 10 == 0 or batch_idx == total_batches - 1:
-                current_lr = self.optimizer.param_groups[0]['lr']
-                avg_loss = np.mean(epoch_losses[-10:]) if len(epoch_losses) >= 10 else np.mean(epoch_losses)
-                progress_pct = (batch_idx + 1) * 100 // total_batches
-                
-                logger.info(f"📈 Epoch {epoch+1:3d} [{batch_idx+1:3d}/{total_batches:3d}] ({progress_pct:3d}%) "
-                          f"| Loss: {avg_loss:.6f} | LR: {current_lr:.2e}")
+            # Update progress bar with current loss
+            current_lr = self.optimizer.param_groups[0]['lr']
+            avg_loss = np.mean(epoch_losses[-10:]) if len(epoch_losses) >= 10 else np.mean(epoch_losses)
+            pbar.set_postfix_str(f"{avg_loss:.4f} (LR: {current_lr:.2e})")
             
             # CSV logging at specified frequency
             if batch_idx % self.config['log_freq'] == 0:
-                current_lr = self.optimizer.param_groups[0]['lr']
                 self.csv_logger.log_batch(self.step, epoch, loss.item(), current_lr)
             
             self.step += 1
@@ -340,7 +345,8 @@ class OfficialLeRobotACTTrainer:
         val_losses = []
         
         with torch.no_grad():
-            for batch in self.val_loader:
+            pbar = tqdm(self.val_loader, desc="Validating", ncols=100, leave=False)
+            for batch in pbar:
                 # Move tensors to device (skip non-tensor fields like episode_id, frame_id, timestamp)
                 tensor_keys = ['observation.images.cam_front', 'observation.state', 'action', 'action_is_pad']
                 for key in tensor_keys:
@@ -350,6 +356,10 @@ class OfficialLeRobotACTTrainer:
                 # Forward pass - LeRobot ACT returns (loss, loss_dict)
                 loss, loss_dict = self.policy(batch)
                 val_losses.append(loss.item())
+                
+                # Update progress bar
+                avg_val_loss = np.mean(val_losses)
+                pbar.set_postfix_str(f"Loss: {avg_val_loss:.4f}")
         
         return np.mean(val_losses)
     
@@ -389,15 +399,15 @@ class OfficialLeRobotACTTrainer:
         training_start_time = time.time()
         
         for epoch in range(self.config['num_epochs']):
-            logger.info(f"\n{'='*80}")
-            logger.info(f"🏃 EPOCH {epoch+1}/{self.config['num_epochs']}")
-            logger.info(f"{'='*80}")
+            print(f"\n{'='*80}")
+            print(f"🏃 EPOCH {epoch+1}/{self.config['num_epochs']}")
+            print(f"{'='*80}\n")
             
             # Training
             train_loss, epoch_time = self.train_epoch(epoch)
             
             # Validation
-            logger.info("🔍 Running validation...")
+            print()  # Newline after training progress bar
             val_loss = self.validate()
             
             # Scheduler step
@@ -408,7 +418,7 @@ class OfficialLeRobotACTTrainer:
             is_best = val_loss < self.best_val_loss
             if is_best:
                 self.best_val_loss = val_loss
-                logger.info(f"🌟 New best model! Val loss: {val_loss:.6f}")
+                print(f"🌟 New best model! Val loss: {val_loss:.6f}")
             
             # Logging
             self.csv_logger.log_epoch(
@@ -416,26 +426,33 @@ class OfficialLeRobotACTTrainer:
                 current_lr, epoch_time, len(self.train_dataset)
             )
             
-            logger.info(f"\n📊 Epoch {epoch+1:3d} Summary:")
-            logger.info(f"   Train Loss: {train_loss:.6f}")
-            logger.info(f"   Val Loss:   {val_loss:.6f}")
-            logger.info(f"   Best Loss:  {self.best_val_loss:.6f}")
-            logger.info(f"   LR:         {current_lr:.2e}")
-            logger.info(f"   Time:       {epoch_time:.1f}s")
+            # Epoch summary
+            mins, secs = divmod(int(epoch_time), 60)
+            print(f"\n📊 Epoch {epoch+1}/{self.config['num_epochs']} Summary:")
+            print(f"   ├─ Train Loss: {train_loss:.6f}")
+            print(f"   ├─ Val Loss:   {val_loss:.6f}")
+            print(f"   ├─ Best Loss:  {self.best_val_loss:.6f}")
+            print(f"   ├─ LR:         {current_lr:.2e}")
+            print(f"   └─ Time:       {mins}m {secs}s")
             
             # Save checkpoint
             if (epoch + 1) % self.config['save_freq'] == 0 or is_best:
                 self.save_checkpoint(epoch, is_best)
         
         total_time = time.time() - training_start_time
+        hrs, rem = divmod(int(total_time), 3600)
+        mins, secs = divmod(rem, 60)
         
-        logger.info("\n" + "=" * 80)
-        logger.info("🎉 TRAINING COMPLETED!")
-        logger.info("=" * 80)
-        logger.info(f"📊 Best validation loss: {self.best_val_loss:.6f}")
-        logger.info(f"⏱️  Total training time: {total_time/60:.1f} minutes")
-        logger.info(f"📁 Models saved in: {self.output_dir}")
-        logger.info("=" * 80)
+        print("\n" + "=" * 80)
+        print("🎉 TRAINING COMPLETED!")
+        print("=" * 80)
+        print(f"📊 Best validation loss: {self.best_val_loss:.6f}")
+        if hrs > 0:
+            print(f"⏱️  Total training time: {hrs}h {mins}m {secs}s")
+        else:
+            print(f"⏱️  Total training time: {mins}m {secs}s")
+        print(f"📁 Models saved in: {self.output_dir}")
+        print("=" * 80)
 
 def get_lerobot_config() -> Dict[str, Any]:
     """Get configuration for LeRobot ACT training"""
