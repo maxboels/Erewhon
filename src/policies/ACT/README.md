@@ -8,7 +8,54 @@
 
 **We now use the official LeRobot ACT architecture** with configuration for RC car control.
 
-### Training:
+### Training with tmux (Recommended) ⭐
+
+**Best way to train:** Use tmux in a **separate terminal** (not VS Code) for persistent, monitored training:
+
+```bash
+# In system terminal (NOT VS Code)
+tmux new -s training
+
+# Split vertically: Ctrl+B then %
+# You now have 2 panes side-by-side
+
+# LEFT PANE (training):
+conda activate lerobot
+python src/policies/ACT/official_lerobot_trainer.py \
+    --data_dir src/robots/rover/episodes \
+    --output_dir ./outputs/lerobot_act \
+    --epochs 100 \
+    --batch_size 8 \
+    --device cuda
+
+# Switch to RIGHT PANE: Ctrl+B then →
+watch -n 1 nvidia-smi
+
+# Split right pane horizontally: Ctrl+B then "
+# Now you have 3 panes total
+
+# BOTTOM RIGHT (move down with Ctrl+B then ↓):
+tail -f outputs/lerobot_act/lerobot_act_*/logs/batch_metrics.csv
+
+# Detach when needed: Ctrl+B then D
+# Reattach anytime: tmux attach -t training
+```
+
+**Layout you'll see:**
+```
+┌─────────────────────────┬─────────────────────────┐
+│                         │ GPU: 45% | Mem: 8GB    │
+│ 📈 Epoch 12 [450/1401]  │ Temp: 72°C              │
+│ Loss: 0.234             │ Power: 150W             │
+│ LR: 8.5e-05             ├─────────────────────────┤
+│                         │ Latest batch losses:    │
+│ Training output...      │ 1240,12,0.196,8.5e-05   │
+│                         │ 1250,12,0.203,8.5e-05   │
+└─────────────────────────┴─────────────────────────┘
+```
+
+### Simple Training (Alternative):
+
 ```bash
 python official_lerobot_trainer.py \
     --data_dir ../../episodes \

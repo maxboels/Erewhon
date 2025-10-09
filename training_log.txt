@@ -1,0 +1,6 @@
+WARNING:root:RPi.GPIO not available. Running in simulation mode.
+WARNING:local_dataset_loader:No episode_data.json found in src/robots/rover/episodes/episode_20251008_164951
+WARNING:local_dataset_loader:No episode_data.json found in src/robots/rover/episodes/episode_20251008_165412
+WARNING:local_dataset_loader:No episode_data.json found in src/robots/rover/episodes/episode_20251008_170108
+ERROR:local_dataset_loader:Invalid JSON in src/robots/rover/episodes/episode_20251008_170534: Expecting value: line 1 column 1 (char 0)
+✅ Successfully imported official LeRobot ACT implementation

@@ -79,42 +79,38 @@ class CSVLogger:
             writer.writerow([epoch, train_loss, val_loss, best_val_loss, learning_rate, 
                            epoch_time, total_samples, datetime.now().isoformat()])
 
-class TracerOfficialACTDataset(Dataset):
-    """Dataset wrapper for official LeRobot ACT training"""
+def lerobot_collate_fn(batch):
+    """Custom collate function for LeRobot ACT - formats batch correctly"""
+    # Stack tensors
+    result = {}
     
-    def __init__(self, data_dir: str, transforms=None):
-        self.base_dataset = TracerLocalDataset(
-            data_dir=data_dir,
-            transforms=transforms,
-            sync_tolerance=0.05,
-            episode_length=None  # Use all available data
-        )
-        
-        # Log dataset statistics
-        logger.info(f"📊 Dataset loaded:")
-        logger.info(f"   Total samples: {len(self.base_dataset)}")
-        
-        # Simple logging without accessing internal samples
-        logger.info(f"   Ready for training with LeRobot ACT")
-        
-    def __len__(self):
-        return len(self.base_dataset)
+    # Stack images
+    result['observation.images.cam_front'] = torch.stack([item['observation.images.cam_front'] for item in batch])
     
-    def __getitem__(self, idx):
-        sample = self.base_dataset[idx]
-        
-        # Convert to LeRobot format
-        observation = {
-            "image_front": sample['image'],  # Shape: [C, H, W]
-            "state": sample['action']        # Shape: [2] (current state as previous action)
-        }
-        
-        action = sample['action']  # Shape: [2]
-        
-        return {
-            "observation": observation,
-            "action": action
-        }
+    # Stack states
+    result['observation.state'] = torch.stack([item['observation.state'] for item in batch])
+    
+    # Stack actions (single timestep per sample)
+    actions = torch.stack([item['action'] for item in batch])  # [B, 2]
+    
+    # Expand to chunk size: repeat the same action for all timesteps in chunk
+    # Use repeat() not expand() to create actual copies (pin_memory requires this)
+    chunk_size = 32  # Must match config
+    result['action'] = actions.unsqueeze(1).repeat(1, chunk_size, 1)  # [B, chunk_size, 2]
+    
+    # Add action_is_pad mask (all valid for now)
+    result['action_is_pad'] = torch.zeros(len(batch), chunk_size, dtype=torch.bool)
+    
+    # Keep metadata as lists (not tensors)
+    if 'episode_id' in batch[0]:
+        result['episode_id'] = [item['episode_id'] for item in batch]
+    if 'frame_id' in batch[0]:
+        result['frame_id'] = [item['frame_id'] for item in batch]
+    if 'timestamp' in batch[0]:
+        result['timestamp'] = [item['timestamp'] for item in batch]
+    
+    return result
+
 
 class OfficialLeRobotACTTrainer:
     """Trainer using official LeRobot ACT implementation"""
@@ -154,11 +150,16 @@ class OfficialLeRobotACTTrainer:
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
         
-        # Create dataset
-        dataset = TracerOfficialACTDataset(
+        # Create dataset - TracerLocalDataset already returns correct LeRobot format
+        dataset = TracerLocalDataset(
             data_dir=self.config['data_dir'],
-            transforms=transform
+            transforms=transform,
+            sync_tolerance=0.05,
+            episode_length=None  # Use all available data
         )
+        
+        logger.info(f"📊 Dataset loaded:")
+        logger.info(f"   Total samples: {len(dataset)}")
         
         # Split dataset
         train_size = int(self.config['train_split'] * len(dataset))
@@ -169,14 +170,15 @@ class OfficialLeRobotACTTrainer:
             generator=torch.Generator().manual_seed(self.config['seed'])
         )
         
-        # Create data loaders
+        # Create data loaders with custom collate function
         self.train_loader = DataLoader(
             self.train_dataset,
             batch_size=self.config['batch_size'],
             shuffle=True,
             num_workers=self.config['num_workers'],
             pin_memory=True,
-            drop_last=True
+            drop_last=True,
+            collate_fn=lerobot_collate_fn
         )
         
         self.val_loader = DataLoader(
@@ -185,7 +187,8 @@ class OfficialLeRobotACTTrainer:
             shuffle=False,
             num_workers=self.config['num_workers'],
             pin_memory=True,
-            drop_last=False
+            drop_last=False,
+            collate_fn=lerobot_collate_fn
         )
         
         logger.info(f"   Training samples: {len(self.train_dataset)}")
@@ -197,13 +200,22 @@ class OfficialLeRobotACTTrainer:
         
         # Create ACT configuration for RC car
         act_config = ACTConfig(
-            # Input/Output shapes for RC car
-            input_shapes={
-                "observation.images.cam_front": [3, self.config['image_height'], self.config['image_width']],
-                "observation.state": [2],  # [steering, throttle]
+            # Input/Output features for RC car
+            input_features={
+                "observation.images.cam_front": PolicyFeature(
+                    type=FeatureType.VISUAL,
+                    shape=(3, self.config['image_height'], self.config['image_width'])
+                ),
+                "observation.state": PolicyFeature(
+                    type=FeatureType.STATE,
+                    shape=(2,)  # [steering, throttle]
+                ),
             },
-            output_shapes={
-                "action": [2],  # [steering, throttle] PWM outputs
+            output_features={
+                "action": PolicyFeature(
+                    type=FeatureType.ACTION,
+                    shape=(2,)  # [steering, throttle] PWM outputs
+                ),
             },
             
             # Observation configuration
@@ -276,13 +288,13 @@ class OfficialLeRobotACTTrainer:
         epoch_losses = []
         epoch_start_time = time.time()
         
+        total_batches = len(self.train_loader)
+        
         for batch_idx, batch in enumerate(self.train_loader):
-            # Move to device
-            for key in batch:
-                if isinstance(batch[key], dict):
-                    for sub_key in batch[key]:
-                        batch[key][sub_key] = batch[key][sub_key].to(self.device)
-                else:
+            # Move tensors to device (skip non-tensor fields like episode_id, frame_id, timestamp)
+            tensor_keys = ['observation.images.cam_front', 'observation.state', 'action', 'action_is_pad']
+            for key in tensor_keys:
+                if key in batch and isinstance(batch[key], torch.Tensor):
                     batch[key] = batch[key].to(self.device)
             
             # Forward pass - LeRobot ACT returns (loss, loss_dict)
@@ -300,12 +312,19 @@ class OfficialLeRobotACTTrainer:
             # Logging
             epoch_losses.append(loss.item())
             
+            # Progress logging - every 10 batches or at the end
+            if batch_idx % 10 == 0 or batch_idx == total_batches - 1:
+                current_lr = self.optimizer.param_groups[0]['lr']
+                avg_loss = np.mean(epoch_losses[-10:]) if len(epoch_losses) >= 10 else np.mean(epoch_losses)
+                progress_pct = (batch_idx + 1) * 100 // total_batches
+                
+                logger.info(f"📈 Epoch {epoch+1:3d} [{batch_idx+1:3d}/{total_batches:3d}] ({progress_pct:3d}%) "
+                          f"| Loss: {avg_loss:.6f} | LR: {current_lr:.2e}")
+            
+            # CSV logging at specified frequency
             if batch_idx % self.config['log_freq'] == 0:
                 current_lr = self.optimizer.param_groups[0]['lr']
                 self.csv_logger.log_batch(self.step, epoch, loss.item(), current_lr)
-                
-                logger.info(f"Epoch {epoch:3d} [{batch_idx:3d}/{len(self.train_loader):3d}] "
-                          f"Loss: {loss.item():.6f} LR: {current_lr:.2e}")
             
             self.step += 1
         
@@ -322,12 +341,10 @@ class OfficialLeRobotACTTrainer:
         
         with torch.no_grad():
             for batch in self.val_loader:
-                # Move to device
-                for key in batch:
-                    if isinstance(batch[key], dict):
-                        for sub_key in batch[key]:
-                            batch[key][sub_key] = batch[key][sub_key].to(self.device)
-                    else:
+                # Move tensors to device (skip non-tensor fields like episode_id, frame_id, timestamp)
+                tensor_keys = ['observation.images.cam_front', 'observation.state', 'action', 'action_is_pad']
+                for key in tensor_keys:
+                    if key in batch and isinstance(batch[key], torch.Tensor):
                         batch[key] = batch[key].to(self.device)
                 
                 # Forward pass - LeRobot ACT returns (loss, loss_dict)
@@ -359,15 +376,28 @@ class OfficialLeRobotACTTrainer:
     
     def train(self):
         """Main training loop"""
-        logger.info(f"🚀 Starting training for {self.config['num_epochs']} epochs")
+        logger.info("=" * 80)
+        logger.info("🚀 STARTING TRAINING")
+        logger.info("=" * 80)
         logger.info(f"📊 Training samples: {len(self.train_dataset)}")
         logger.info(f"📊 Validation samples: {len(self.val_dataset)}")
+        logger.info(f"🎯 Total epochs: {self.config['num_epochs']}")
+        logger.info(f"📦 Batch size: {self.config['batch_size']}")
+        logger.info(f"💾 Output directory: {self.output_dir}")
+        logger.info("=" * 80)
+        
+        training_start_time = time.time()
         
         for epoch in range(self.config['num_epochs']):
+            logger.info(f"\n{'='*80}")
+            logger.info(f"🏃 EPOCH {epoch+1}/{self.config['num_epochs']}")
+            logger.info(f"{'='*80}")
+            
             # Training
             train_loss, epoch_time = self.train_epoch(epoch)
             
             # Validation
+            logger.info("🔍 Running validation...")
             val_loss = self.validate()
             
             # Scheduler step
@@ -378,6 +408,7 @@ class OfficialLeRobotACTTrainer:
             is_best = val_loss < self.best_val_loss
             if is_best:
                 self.best_val_loss = val_loss
+                logger.info(f"🌟 New best model! Val loss: {val_loss:.6f}")
             
             # Logging
             self.csv_logger.log_epoch(
@@ -385,17 +416,26 @@ class OfficialLeRobotACTTrainer:
                 current_lr, epoch_time, len(self.train_dataset)
             )
             
-            logger.info(f"Epoch {epoch:3d} | Train: {train_loss:.6f} | Val: {val_loss:.6f} | "
-                       f"Best: {self.best_val_loss:.6f} | LR: {current_lr:.2e} | "
-                       f"Time: {epoch_time:.1f}s")
+            logger.info(f"\n📊 Epoch {epoch+1:3d} Summary:")
+            logger.info(f"   Train Loss: {train_loss:.6f}")
+            logger.info(f"   Val Loss:   {val_loss:.6f}")
+            logger.info(f"   Best Loss:  {self.best_val_loss:.6f}")
+            logger.info(f"   LR:         {current_lr:.2e}")
+            logger.info(f"   Time:       {epoch_time:.1f}s")
             
             # Save checkpoint
             if (epoch + 1) % self.config['save_freq'] == 0 or is_best:
                 self.save_checkpoint(epoch, is_best)
         
-        logger.info("🎉 Training completed!")
+        total_time = time.time() - training_start_time
+        
+        logger.info("\n" + "=" * 80)
+        logger.info("🎉 TRAINING COMPLETED!")
+        logger.info("=" * 80)
         logger.info(f"📊 Best validation loss: {self.best_val_loss:.6f}")
+        logger.info(f"⏱️  Total training time: {total_time/60:.1f} minutes")
         logger.info(f"📁 Models saved in: {self.output_dir}")
+        logger.info("=" * 80)
 
 def get_lerobot_config() -> Dict[str, Any]:
     """Get configuration for LeRobot ACT training"""
@@ -456,6 +496,10 @@ def main():
     
     args = parser.parse_args()
     
+    print("\n" + "=" * 80)
+    print("🤖 LEROBOT ACT TRAINER FOR RC CAR")
+    print("=" * 80)
+    
     # Load configuration
     config = get_lerobot_config()
     
@@ -474,19 +518,37 @@ def main():
     # Validate data directory
     data_dir = Path(config['data_dir'])
     if not data_dir.exists():
-        logger.error(f"Data directory not found: {data_dir}")
+        logger.error(f"❌ Data directory not found: {data_dir}")
         return
+    
+    print(f"\n📁 Data Directory: {data_dir}")
+    print("🔍 Scanning for episodes...")
     
     episodes = list(data_dir.glob('episode_*'))
-    logger.info(f"Found {len(episodes)} episodes in {data_dir}")
+    logger.info(f"📊 Found {len(episodes)} episode directories")
     
     if len(episodes) == 0:
-        logger.error("No episodes found!")
+        logger.error("❌ No episodes found!")
         return
     
+    print(f"✅ Found {len(episodes)} episode directories")
+    print("\n🔧 Configuration:")
+    print(f"   Epochs: {config['num_epochs']}")
+    print(f"   Batch Size: {config['batch_size']}")
+    print(f"   Device: {config['device']}")
+    print(f"   Output: {config['output_dir']}")
+    print("=" * 80 + "\n")
+    
     # Start training
-    trainer = OfficialLeRobotACTTrainer(config)
-    trainer.train()
+    try:
+        trainer = OfficialLeRobotACTTrainer(config)
+        trainer.train()
+    except KeyboardInterrupt:
+        logger.info("\n\n⚠️  Training interrupted by user")
+        logger.info("💾 Latest checkpoint should be saved in output directory")
+    except Exception as e:
+        logger.error(f"\n\n❌ Training failed with error: {e}")
+        raise
 
 if __name__ == "__main__":
     main()

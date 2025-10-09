@@ -53,27 +53,43 @@ class TracerLocalDataset(Dataset):
         """Load all episode data from the data directory"""
         episodes = []
         
-        for episode_dir in self.data_dir.iterdir():
-            if not episode_dir.is_dir():
-                continue
+        # Get all episode directories sorted
+        episode_dirs = sorted([d for d in self.data_dir.iterdir() if d.is_dir() and d.name.startswith('episode_')])
+        total_dirs = len(episode_dirs)
+        
+        logger.info(f"📂 Found {total_dirs} episode directories to scan...")
+        
+        for idx, episode_dir in enumerate(episode_dirs, 1):
+            # Progress indicator every 10 episodes
+            if idx % 10 == 0 or idx == total_dirs:
+                logger.info(f"   Scanning episodes: {idx}/{total_dirs} ({idx*100//total_dirs}%)")
                 
             episode_data_path = episode_dir / "episode_data.json"
             if not episode_data_path.exists():
-                logger.warning(f"No episode_data.json found in {episode_dir}")
+                logger.warning(f"⚠️  Skipping {episode_dir.name}: No episode_data.json found")
                 continue
             
             try:
                 with open(episode_data_path, 'r') as f:
                     episode_data = json.load(f)
                 
+                # Validate episode has required fields
+                if not episode_data.get('frame_samples') or not episode_data.get('control_samples'):
+                    logger.warning(f"⚠️  Skipping {episode_dir.name}: Missing frame_samples or control_samples")
+                    continue
+                
                 # Add episode directory path
                 episode_data['episode_dir'] = episode_dir
                 episodes.append(episode_data)
                 
+            except json.JSONDecodeError as e:
+                logger.warning(f"⚠️  Skipping {episode_dir.name}: Invalid JSON - {e}")
+                continue
             except Exception as e:
-                logger.error(f"Error loading episode {episode_dir}: {e}")
+                logger.warning(f"⚠️  Skipping {episode_dir.name}: Error - {e}")
                 continue
         
+        logger.info(f"✅ Successfully loaded {len(episodes)} valid episodes (out of {total_dirs} total)")
         return episodes
     
     def _synchronize_episode(self, episode: Dict) -> List[Dict]:
@@ -120,8 +136,8 @@ class TracerLocalDataset(Dataset):
                 # Only include if within tolerance
                 if best_control and min_time_diff <= self.sync_tolerance:
                     # Determine state (previous action) vs action (current)
-                    if i == 0:
-                        # First frame: use neutral state or current action
+                    if i == 0 or previous_control is None:
+                        # First frame or no previous control: use neutral state
                         state_steering = 0.0  # Neutral steering
                         state_throttle = 0.0  # Neutral throttle
                     else:
@@ -157,15 +173,22 @@ class TracerLocalDataset(Dataset):
         return synchronized_samples
     
     def _synchronize_all_episodes(self) -> List[Dict]:
-        """Synchronize frames and controls for all episodes"""
-        all_synchronized = []
+        """Synchronize all loaded episodes and create training samples"""
+        all_samples = []
+        total_episodes = len(self.episodes)
         
-        for episode in self.episodes:
-            episode_sync = self._synchronize_episode(episode)
-            all_synchronized.extend(episode_sync)
-            logger.info(f"Episode {episode['episode_id']}: {len(episode_sync)} synchronized samples")
+        logger.info(f"🔄 Synchronizing {total_episodes} episodes...")
         
-        return all_synchronized
+        for idx, episode in enumerate(self.episodes, 1):
+            episode_samples = self._synchronize_episode(episode)
+            all_samples.extend(episode_samples)
+            
+            # Progress indicator every 10 episodes
+            if idx % 10 == 0 or idx == total_episodes:
+                logger.info(f"   Synchronized: {idx}/{total_episodes} episodes ({len(all_samples)} samples so far)")
+        
+        logger.info(f"✅ Total synchronized samples: {len(all_samples)}")
+        return all_samples
     
     def __len__(self) -> int:
         return len(self.synchronized_data)

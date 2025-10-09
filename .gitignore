@@ -46,3 +46,7 @@ episode_animations/
 # Private documentation with sensitive info
 README_private.md
 *_private.md
+outputs/lerobot_act/lerobot_*/checkpoint_epoch_*.pth
+outputs/lerobot_act/*/*.pth
+outputs/lerobot_act/lerobot_act_*/logs/*.csv
+outputs/lerobot_act/*/*.json

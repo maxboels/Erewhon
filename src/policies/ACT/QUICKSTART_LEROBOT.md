@@ -39,7 +39,47 @@ src/policies/ACT/deprecated/
 
 ## 🏃 Quick Commands
 
-### 1️⃣ Training (Default):
+### 1️⃣ Training with tmux (Recommended) ⭐
+
+**Best practice:** Run training in tmux for persistent monitoring:
+
+```bash
+# In system terminal (NOT VS Code)
+tmux new -s training
+
+# Split vertically: Ctrl+B then %
+# You now have 2 panes side-by-side
+
+# LEFT PANE (training):
+conda activate lerobot
+cd /home/maxboels/projects/Erewhon
+python src/policies/ACT/official_lerobot_trainer.py \
+    --data_dir src/robots/rover/episodes \
+    --output_dir ./outputs/lerobot_act \
+    --epochs 100 \
+    --batch_size 8 \
+    --device cuda
+
+# Switch to RIGHT PANE: Ctrl+B then →
+watch -n 1 nvidia-smi
+
+# Split right pane horizontally: Ctrl+B then "
+# Now you have 3 panes total
+
+# BOTTOM RIGHT (move down with Ctrl+B then ↓):
+tail -f outputs/lerobot_act/lerobot_act_*/logs/batch_metrics.csv
+
+# Detach when needed: Ctrl+B then D
+# Reattach anytime: tmux attach -t training
+```
+
+**Why tmux?**
+- ✅ Survives SSH disconnections
+- ✅ Monitor GPU + training + logs simultaneously
+- ✅ Can close laptop, training continues
+- ✅ Beautiful 3-pane layout
+
+### 2️⃣ Training (Simple):
 ```bash
 cd /home/maxboels/projects/Erewhon
 
@@ -51,7 +91,7 @@ python src/policies/ACT/official_lerobot_trainer.py \
     --device cuda
 ```
 
-### 2️⃣ Training (Custom):
+### 3️⃣ Training (Custom):
 ```bash
 python src/policies/ACT/official_lerobot_trainer.py \
     --data_dir ./episodes \
@@ -62,7 +102,7 @@ python src/policies/ACT/official_lerobot_trainer.py \
     --device cuda
 ```
 
-### 3️⃣ Inference Test:
+### 4️⃣ Inference Test:
 ```bash
 # With test image
 python src/policies/ACT/lerobot_act_inference.py \
