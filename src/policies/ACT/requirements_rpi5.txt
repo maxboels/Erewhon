@@ -1,0 +1,17 @@
+# Raspberry Pi 5 Deployment Requirements
+# Install with: pip3 install -r requirements_rpi5.txt
+
+# PyTorch for ARM (CPU-only, quantization support)
+# Install separately with:
+# pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# Core dependencies
+numpy>=1.21.0
+opencv-python>=4.5.0
+Pillow>=9.0.0
+pyserial>=3.5
+tqdm>=4.64.0
+
+# Optional but recommended
+# psutil  # For system monitoring
+# gpustat  # For GPU monitoring (if using)

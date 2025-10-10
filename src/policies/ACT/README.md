@@ -72,12 +72,34 @@ python lerobot_act_inference.py \
     --test_image test.jpg
 ```
 
+### Edge Deployment (Raspberry Pi 5) 🆕
+
+**Quantize for low-latency inference (<30ms):**
+
+```bash
+# Automated pipeline (recommended)
+./deploy_quantized_model.sh \
+    outputs/lerobot_act/best_model.pth \
+    src/robots/rover/episodes \
+    pi@raspberrypi
+
+# Deploy to Pi and test
+ssh pi@raspberrypi
+cd ~/act_model
+python3 lerobot_act_inference_rpi5.py \
+    --checkpoint model.pth \
+    --camera_id 0 \
+    --arduino_port /dev/ttyUSB0
+```
+
 ---
 
 ## 📚 Documentation
 
 **Start here:**
 - 📖 **[README_LEROBOT_ACT.md](README_LEROBOT_ACT.md)** - Complete guide
+- 🔧 **[QUANTIZATION_GUIDE.md](QUANTIZATION_GUIDE.md)** - Edge deployment ⭐ NEW!
+- 📋 **[QUANTIZATION_SUMMARY.md](QUANTIZATION_SUMMARY.md)** - Quick reference
 - ⚡ **[QUICKSTART_LEROBOT.md](QUICKSTART_LEROBOT.md)** - Quick commands
 - ✅ **[FINAL_SUMMARY.md](FINAL_SUMMARY.md)** - Migration summary
 
