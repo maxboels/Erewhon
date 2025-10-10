@@ -175,12 +175,15 @@ IS_QUANTIZED=$(python3 -c "import torch; ckpt = torch.load('$CHECKPOINT', map_lo
 ```bash
 ssh mboels@raspberrypi
 
-# Install PyTorch for ARM (CPU-only)
-pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# Option 1: Install from requirements file (RECOMMENDED - ensures version compatibility)
+pip3 install -r src/robots/rover/requirements_pi.txt --index-url https://download.pytorch.org/whl/cpu
 
-# Install other dependencies
-pip3 install opencv-python numpy pyserial
+# Option 2: Manual installation (use specific versions to match development environment)
+pip3 install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cpu
+pip3 install numpy==2.2.6 opencv-python==4.12.0.88 pyserial==3.5
 ```
+
+**⚠️ Important:** Use the same versions as your development environment to ensure compatibility with the quantized model!
 
 ### 2. Benchmark Performance
 

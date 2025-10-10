@@ -1,0 +1,14 @@
+# Raspberry Pi 5 Requirements
+# Compatible with development environment (conda lerobot)
+
+# PyTorch for ARM (CPU-only) - Match development version
+torch==2.8.0
+torchvision==0.23.0
+
+# Core dependencies - Match development versions
+numpy==2.2.6
+opencv-python==4.12.0.88
+pyserial==3.5
+
+# Optional: For better performance monitoring
+psutil>=5.9.0
