@@ -32,7 +32,16 @@ This folder contains comprehensive documentation about the ACT model quantizatio
 
 ## 🎯 Quick Start
 
-If you're on the Raspberry Pi and want to run inference immediately:
+**On Raspberry Pi:** If you already have the repo set up with sparse checkout, just update to get these docs:
+
+```bash
+cd ~/projects/Erewhon  # or wherever you cloned the repo
+git pull origin main
+cd src/robots/rover/docs/quantization
+ls -lh  # You should now see all the guides!
+```
+
+If you're running inference for the first time:
 
 ### 1. Check Your Model
 ```bash

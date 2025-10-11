@@ -1,5 +1,7 @@
 # Sparse Checkout Setup for Raspberry Pi
 
+**⚡ Quick Note:** If you already have sparse checkout configured for `src/robots/rover`, you don't need to do anything special! A simple `git pull` will automatically include the new quantization documentation. See [Option 2](#option-2-update-existing-sparse-checkout-if-already-set-up) below.
+
 This guide shows how to set up the repository on Raspberry Pi with only the `src/robots/rover` directory checked out, including the new quantization documentation.
 
 ## 🎯 What is Sparse Checkout?
@@ -78,22 +80,21 @@ ONNX_AND_FORMATS_EXPLAINED.md
 HAILO_DEPLOYMENT_GUIDE.md
 ```
 
-### Option 2: Update Existing Sparse Checkout
+### Option 2: Update Existing Sparse Checkout (If Already Set Up)
 
-If you already have the repo cloned with sparse checkout:
+**Good news!** If you already have `src/robots/rover` in sparse checkout, the new quantization docs are **automatically included**. Just pull the latest changes:
 
 ```bash
 cd ~/projects/Erewhon
 
-# Update sparse checkout configuration to include new docs
-git sparse-checkout set src/robots/rover
-
-# Pull latest changes
+# Pull latest changes (docs will update automatically!)
 git pull origin main
 
 # Verify new docs are present
 ls -la src/robots/rover/docs/quantization/
 ```
+
+No need to reconfigure sparse checkout - everything under `src/robots/rover/` is already tracked, including the new `docs/quantization/` folder!
 
 ## 🔄 Updating the Pi Repository
 
