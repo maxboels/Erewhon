@@ -66,9 +66,9 @@ class MinimalACTInference:
     def __init__(self, checkpoint_path: str, image_size: Tuple[int, int] = (360, 640)):
         self.image_size = image_size
         
-        # Load checkpoint
+        # Load checkpoint (weights_only=False for quantized models with custom classes)
         logger.info(f"Loading model from {checkpoint_path}")
-        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
         
         # Load model (already quantized)
         self.model = checkpoint.get('model', checkpoint.get('model_state_dict', checkpoint))
