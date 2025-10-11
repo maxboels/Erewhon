@@ -2,6 +2,17 @@
 
 End-to-end system for training an RC car to drive autonomously using imitation learning on a Raspberry Pi 5.
 
+## 📚 Documentation
+
+- **[SPARSE_CHECKOUT_SETUP.md](./SPARSE_CHECKOUT_SETUP.md)** - Git sparse checkout configuration for Pi
+- **[PI_DEPLOYMENT_COMMANDS.md](./PI_DEPLOYMENT_COMMANDS.md)** - Quick command reference for deployment
+- **[QUANTIZATION_DEPLOYMENT_SUMMARY.md](./QUANTIZATION_DEPLOYMENT_SUMMARY.md)** - Deployment summary
+- **[docs/quantization/](./docs/quantization/)** - Complete quantization guides and explanations
+  - Quantization methods and workflows
+  - ONNX format explanations
+  - Hailo NPU deployment guide
+  - Performance benchmarks
+
 ## System Overview
 
 ```
