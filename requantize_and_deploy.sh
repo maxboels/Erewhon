@@ -12,14 +12,14 @@ echo ""
 
 # Configuration
 ORIGINAL_MODEL="outputs/lerobot_act/lerobot_act_20251009_101545/best_model.pth"
-QUANTIZED_MODEL="outputs/lerobot_act/best_model_static_quantized.pth"
+QUANTIZED_MODEL="outputs/lerobot_act/best_model_quantized.pth"
 CALIBRATION_DATA="src/robots/rover/episodes"
 RPI_HOST="${1:-mboels@raspberrypi}"
 
 echo "📋 Configuration:"
 echo "   Original model: $ORIGINAL_MODEL"
 echo "   Output: $QUANTIZED_MODEL"
-echo "   Calibration: $CALIBRATION_DATA"
+echo "   Mode: dynamic (more reliable)"
 echo "   Pi host: $RPI_HOST"
 echo ""
 
@@ -31,11 +31,8 @@ echo ""
 
 python src/policies/ACT/quantize_act_model.py \
     --checkpoint "$ORIGINAL_MODEL" \
-    --mode static \
-    --calibration_data "$CALIBRATION_DATA" \
-    --num_calibration_batches 200 \
-    --output "$QUANTIZED_MODEL" \
-    --benchmark
+    --mode dynamic \
+    --output "$QUANTIZED_MODEL"
 
 echo ""
 echo "✅ Quantization complete!"
@@ -49,7 +46,7 @@ echo ""
 
 python3 -c "
 import torch
-ckpt = torch.load('$QUANTIZED_MODEL', map_location='cpu')
+ckpt = torch.load('$QUANTIZED_MODEL', map_location='cpu', weights_only=False)
 print(f'✅ Checkpoint keys: {list(ckpt.keys())}')
 print(f'✅ Quantization mode: {ckpt.get(\"quantization_mode\", \"not found\")}')
 print(f'✅ Has full model: {\"model\" in ckpt}')
@@ -71,7 +68,7 @@ ssh "$RPI_HOST" "mkdir -p ~/src/robots/rover/models"
 
 # Transfer model
 echo "Transferring quantized model..."
-scp "$QUANTIZED_MODEL" "$RPI_HOST":~/src/robots/rover/models/
+scp "$QUANTIZED_MODEL" "$RPI_HOST":~/src/robots/rover/models/best_model_quantized.pth
 
 echo ""
 echo "✅ Transfer complete!"
@@ -85,7 +82,7 @@ echo ""
 
 ssh "$RPI_HOST" << 'EOF'
 echo "Checking quantized model on Pi..."
-ls -lh ~/src/robots/rover/models/best_model_static_quantized.pth
+ls -lh ~/src/robots/rover/models/best_model_quantized.pth
 
 echo ""
 echo "Verifying model format..."
@@ -94,7 +91,7 @@ import torch
 import sys
 
 try:
-    ckpt = torch.load('/home/mboels/src/robots/rover/models/best_model_static_quantized.pth', map_location='cpu')
+    ckpt = torch.load('/home/mboels/src/robots/rover/models/best_model_quantized.pth', map_location='cpu', weights_only=False)
     print(f"✅ Model loaded successfully!")
     print(f"✅ Quantization mode: {ckpt.get('quantization_mode', 'not found')}")
     print(f"✅ Has full model: {'model' in ckpt}")
@@ -127,13 +124,14 @@ echo ""
 echo "2. Run benchmark:"
 echo "   cd ~/src/robots/rover"
 echo "   python3 src/inference/act_inference_quantized.py \\"
-echo "       --checkpoint models/best_model_static_quantized.pth \\"
+echo "       --checkpoint models/best_model_quantized.pth \\"
 echo "       --benchmark \\"
 echo "       --iterations 1000"
 echo ""
-echo "3. Expected results:"
-echo "   - Mean latency: ~40ms"
-echo "   - P95 latency: ~50ms"
-echo "   - Control rate: 25-30 Hz"
+echo "3. Expected results (dynamic quantization):"
+echo "   - Mean latency: ~50-60ms"
+echo "   - P95 latency: ~70-80ms"
+echo "   - Control rate: 15-20 Hz"
+echo "   - Model size: ~170 MB (6x compression)"
 echo ""
 echo "=================================================="
