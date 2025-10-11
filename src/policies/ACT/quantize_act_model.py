@@ -349,9 +349,11 @@ class ACTModelQuantizer:
         # Get model size
         original_size = Path(self.checkpoint_path).stat().st_size / (1024 * 1024)  # MB
         
-        # Save quantized model
+        # For quantized models, we need to save the actual model object, not just state_dict
+        # This preserves the quantization metadata and allows loading without reconfiguration
         save_dict = {
-            'model_state_dict': model.state_dict(),
+            'model': model,  # Save the full quantized model
+            'model_state_dict': model.state_dict(),  # Also save state_dict for compatibility
             'config': self.config,
             'quantization_mode': mode,
             'image_size': self.image_size,

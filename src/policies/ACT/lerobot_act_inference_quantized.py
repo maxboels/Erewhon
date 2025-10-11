@@ -98,11 +98,19 @@ class QuantizedACTInference:
                 device='cpu',
             )
         
-        # Create policy
-        self.policy = ACTPolicy(self.config)
-        self.policy.load_state_dict(checkpoint['model_state_dict'])
-        self.policy.to('cpu')
-        self.policy.eval()
+        # Try to load full quantized model first (new format)
+        if 'model' in checkpoint:
+            logger.info("Loading full quantized model object...")
+            self.policy = checkpoint['model']
+            self.policy.to('cpu')
+            self.policy.eval()
+        else:
+            # Fallback: load from state_dict (old format or non-quantized)
+            logger.info("Loading from state_dict (compatibility mode)...")
+            self.policy = ACTPolicy(self.config)
+            self.policy.load_state_dict(checkpoint['model_state_dict'])
+            self.policy.to('cpu')
+            self.policy.eval()
         
         # Image preprocessing
         self.image_transform = transforms.Compose([

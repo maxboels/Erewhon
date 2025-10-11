@@ -92,6 +92,10 @@ class RPi5ACTController:
         logger.info(f"Loading model from {checkpoint_path}")
         checkpoint = torch.load(checkpoint_path, map_location='cpu')
         
+        # Check quantization mode
+        if 'quantization_mode' in checkpoint:
+            logger.info(f"✅ Quantized model detected: {checkpoint['quantization_mode']}")
+        
         # Create config
         if 'config' in checkpoint:
             self.config = checkpoint['config']
@@ -111,10 +115,17 @@ class RPi5ACTController:
                 device='cpu',
             )
         
-        # Create and load policy
-        self.policy = ACTPolicy(self.config)
-        self.policy.load_state_dict(checkpoint['model_state_dict'])
-        self.policy.eval()
+        # Try to load full quantized model first (new format)
+        if 'model' in checkpoint:
+            logger.info("Loading full quantized model object...")
+            self.policy = checkpoint['model']
+            self.policy.eval()
+        else:
+            # Fallback: load from state_dict (old format)
+            logger.info("Loading from state_dict (compatibility mode)...")
+            self.policy = ACTPolicy(self.config)
+            self.policy.load_state_dict(checkpoint['model_state_dict'])
+            self.policy.eval()
         
         # State tracking
         self.current_state = np.array([0.0, 0.0], dtype=np.float32)
