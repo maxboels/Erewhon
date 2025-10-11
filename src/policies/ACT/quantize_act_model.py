@@ -189,11 +189,20 @@ class ACTModelQuantizer:
         import torch.backends.quantized
         torch.backends.quantized.engine = 'qnnpack'  # ARM optimization
         
-        # Configure quantization - embeddings need special handling
+        # Configure quantization - use MinMaxObserver instead of Histogram for stability
         logger.info("   Configuring quantization settings...")
         
+        # Use a simpler observer that's more stable
+        from torch.ao.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver
+        
+        # Create custom qconfig with MinMax observers (more stable than Histogram)
+        qconfig = quant.QConfig(
+            activation=MinMaxObserver.with_args(dtype=torch.quint8, qscheme=torch.per_tensor_affine),
+            weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric)
+        )
+        
         # Set default qconfig for most layers
-        self.model.qconfig = quant.get_default_qconfig('qnnpack')
+        self.model.qconfig = qconfig
         
         # Override qconfig for embedding layers (they need float_qparams)
         def set_embedding_qconfig(module):
